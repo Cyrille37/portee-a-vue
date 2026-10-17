@@ -65,6 +65,7 @@
     hint: document.getElementById("hint"),
     results: document.getElementById("results"),
     clickCoords: document.getElementById("click-coords"),
+    zHeight: document.getElementById("z-height"),
     zGround: document.getElementById("z-ground"),
     zSurface: document.getElementById("z-surface"),
     resInfo: document.getElementById("res-info"),
@@ -140,6 +141,7 @@
 
       // 5. panneau résultats
       el.clickCoords.textContent = `${lngLat.lat.toFixed(6)}/${lngLat.lng.toFixed(6)}`;
+      el.zHeight.textContent = UI.fmtAlt(zSurface - zGround);
       const stepM = dem.step * Math.cos(lat);
       const area = visCount * stepM * stepM;
       el.zGround.textContent = UI.fmtAlt(zGround);
