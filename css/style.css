@@ -47,6 +47,8 @@ footer a { color: #57a; }
 
 .hidden { display: none; }
 
+#busy-overlay.hidden { display: none; }
+
 #busy-overlay {
   position: absolute;
   inset: 0;
