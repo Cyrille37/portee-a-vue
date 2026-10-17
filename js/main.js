@@ -44,7 +44,7 @@
       },
       layers: [{ id: "hot", type: "raster", source: "hot" }],
     },
-    center: view ? view.center : [2.3522, 48.8546],
+    center: view ? view.center : [0.683059, 47.422219],
     zoom: view ? view.zoom : 12,
   });
 
