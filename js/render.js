@@ -35,19 +35,28 @@ const RENDER = (() => {
     return canvas;
   }
 
+  // EPSG:3857 (mètres) -> [lng, lat] degrés WGS84
+  function toLngLat(x, y) {
+    const lng = (x / 20037508.342789244) * 180;
+    let lat = (y / 20037508.342789244) * 180;
+    lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(lat * Math.PI / 180)) - Math.PI / 2);
+    return [lng, lat];
+  }
+
   function showViewshed(map, dem, mask) {
     removeViewshed(map);
     const canvas = maskToCanvas(dem, mask);
     const url = canvas.toDataURL();
+    const [w, s, e, n] = dem.bbox;
 
     map.addSource(SOURCE_ID, {
       type: "image",
       url,
       coordinates: [
-        [dem.bbox[0], dem.bbox[3]], // nord-ouest
-        [dem.bbox[2], dem.bbox[3]], // nord-est
-        [dem.bbox[2], dem.bbox[1]], // sud-est
-        [dem.bbox[0], dem.bbox[1]], // sud-ouest
+        toLngLat(w, n), // nord-ouest
+        toLngLat(e, n), // nord-est
+        toLngLat(e, s), // sud-est
+        toLngLat(w, s), // sud-ouest
       ],
     });
     map.addLayer({
