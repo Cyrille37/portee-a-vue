@@ -222,5 +222,11 @@
   });
   el.obstacles.addEventListener("change", recompute);
 
+  document.getElementById("clear-cache").addEventListener("click", async () => {
+    if (isBusy()) { UI.setStatus("Chargement en cours, réessayez après."); return; }
+    await WMS_DEM.clearCache();
+    UI.setStatus("Cache vidé.");
+  });
+
   updateRadiusLabel();
 })();
