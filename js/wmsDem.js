@@ -18,6 +18,7 @@ const WMS_DEM = (() => {
   const LAYER_MNT = "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES";
   const LAYER_MNS = "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES.MNS";
   const MAX_TILE = 4000;          // garde-fou < limite serveur 5010
+  const QUANT = 1000;             // maille fixe de quantification des bbox (m EPSG:3857)
   const MAX_CELLS = 16e6;          // plafond mémoire ~64 Mo float32
   const CACHE_NAME = "portee-a-vue-wms-dem-v1";
 
@@ -38,8 +39,15 @@ const WMS_DEM = (() => {
 
   // ---- Cache API (persistant) --------------------------------------
   let httpCache = null;
+  let httpCacheWarned = false;
   async function httpCacheOpen() {
-    if (!("caches" in window)) return null;
+    if (!("caches" in window)) {
+      if (!httpCacheWarned) {
+        httpCacheWarned = true;
+        console.warn("Cache API indisponible (contexte non sécurisé ?) : pas de persistance entre sessions.");
+      }
+      return null;
+    }
     if (!httpCache) {
       try { httpCache = await caches.open(CACHE_NAME); }
       catch { return null; }
@@ -100,6 +108,7 @@ const WMS_DEM = (() => {
   async function fetchTile(url, width, height, signal) {
     let buf = await httpCacheGet(url);
     if (!buf) {
+      console.debug("WMS requête réseau (miss cache) :", url);
       const res = await fetch(url, { signal });
       if (!res.ok) throw new Error(`WMS HTTP ${res.status}`);
       buf = await res.arrayBuffer();
@@ -121,22 +130,30 @@ const WMS_DEM = (() => {
    * { grid: Float32Array, width, height, bbox: [w,s,e,n], step }
    * avec row 0 = nord, col 0 = ouest.
    *
-   * La bbox est ancrée sur une grille quantifiée de maille `half` et
-   * couvre toujours 3x3 mailles : tous les clics situés dans une même
-   * maille produisent exactement la même URL → hit cache sans requête
-   * réseau. La maille de 3x3 garantit la couverture du rayon complet
-   * quelle que soit la position du clic dans sa maille.
+   * La bbox est ancrée sur une grille quantifiée fixe de maille QUANT
+   * (1 km en EPSG:3857), indépendante du rayon : tous les clics dont la
+   * zone touche les mêmes mailles produisent exactement la même URL
+   * → hit cache sans requête réseau, même entre rayons différents.
+   *
+   * Précision conservée : ~1 m/pixel tant que la bbox tient sous la
+   * limite serveur (MAX_TILE) et mémoire (MAX_CELLS) ; au-delà, le pas
+   * grossit uniformément.
    */
   async function fetchDem({ cx, cy, half, layer, signal, onProgress }) {
-    const w = Math.floor((cx - half) / half) * half;
-    const s = Math.floor((cy - half) / half) * half;
-    const span = 3 * half;
-    const bbox = [w, s, w + span, s + span];
+    const w = Math.floor((cx - half) / QUANT) * QUANT;
+    const s = Math.floor((cy - half) / QUANT) * QUANT;
+    const e = Math.ceil((cx + half) / QUANT) * QUANT;
+    const n = Math.ceil((cy + half) / QUANT) * QUANT;
 
-    let size = Math.min(MAX_TILE, Math.ceil(span));
-    size = Math.min(size, Math.floor(Math.sqrt(MAX_CELLS)));
-    const width = size, height = size;
-    const step = span / size;
+    const spanX = e - w, spanY = n - s;
+    let step = Math.max(1, Math.max(spanX, spanY) / MAX_TILE);
+    let width = Math.ceil(spanX / step), height = Math.ceil(spanY / step);
+    while (width * height > MAX_CELLS) {
+      step *= 1.25;
+      width = Math.ceil(spanX / step);
+      height = Math.ceil(spanY / step);
+    }
+    const bbox = [w, s, w + width * step, s + height * step];
 
     const url = buildUrl(layer, bbox, width, height);
     const hit = cacheGet(url);
