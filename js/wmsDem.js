@@ -120,21 +120,30 @@ const WMS_DEM = (() => {
    * `half` en mètres. Retourne :
    * { grid: Float32Array, width, height, bbox: [w,s,e,n], step }
    * avec row 0 = nord, col 0 = ouest.
+   *
+   * La bbox est ancrée sur une grille quantifiée de maille `half` et
+   * couvre toujours 3x3 mailles : tous les clics situés dans une même
+   * maille produisent exactement la même URL → hit cache sans requête
+   * réseau. La maille de 3x3 garantit la couverture du rayon complet
+   * quelle que soit la position du clic dans sa maille.
    */
   async function fetchDem({ cx, cy, half, layer, signal, onProgress }) {
-    let size = Math.min(MAX_TILE, Math.ceil(2 * half));
-    size = Math.min(size, Math.floor(Math.sqrt(MAX_CELLS)));
-    const step = (2 * half) / size;
+    const w = Math.floor((cx - half) / half) * half;
+    const s = Math.floor((cy - half) / half) * half;
+    const span = 3 * half;
+    const bbox = [w, s, w + span, s + span];
 
-    // bbox arrondie sur le pas (multiples absolus de step), 2 cellules de marge
-    const w0 = Math.floor((cx - half) / step) * step;
-    const s0 = Math.floor((cy - half) / step) * step;
-    const width = size + 2, height = size + 2;
-    const bbox = [w0, s0, w0 + width * step, s0 + height * step];
+    let size = Math.min(MAX_TILE, Math.ceil(span));
+    size = Math.min(size, Math.floor(Math.sqrt(MAX_CELLS)));
+    const width = size, height = size;
+    const step = span / size;
 
     const url = buildUrl(layer, bbox, width, height);
     const hit = cacheGet(url);
-    if (hit) return hit;
+    if (hit) {
+      console.debug("WMS cache mémoire :", url);
+      return hit;
+    }
 
     if (onProgress) onProgress(0, 1);
     const grid = await fetchTile(url, width, height, signal);
@@ -148,9 +157,13 @@ const WMS_DEM = (() => {
   // Altitude ponctuelle via une requête BIL 1x1.
   // CRS:84 = WGS84 axes (lon, lat) — l'ordre d'axe de EPSG:4326
   // en WMS 1.3.0 est (lat, lon), d'où CRS:84 pour éviter l'inversion.
+  // Coordonnées quantifiées à ~1 m (1e-5°) pour mutualiser le cache.
   async function elevationAt(lon, lat, layer = LAYER_MNT, signal) {
-    const url = buildUrl(layer, [lon, lat, lon + 1e-7, lat + 1e-7], 1, 1, "CRS:84");
+    const lonQ = Math.round(lon * 1e5) / 1e5;
+    const latQ = Math.round(lat * 1e5) / 1e5;
+    const url = buildUrl(layer, [lonQ, latQ, lonQ + 1e-7, latQ + 1e-7], 1, 1, "CRS:84");
     let buf = await httpCacheGet(url);
+    if (buf) console.debug("WMS cache HTTP :", url);
     if (!buf) {
       const res = await fetch(url, { signal });
       if (!res.ok) throw new Error(`WMS HTTP ${res.status}`);
