@@ -39,8 +39,11 @@ js/main.js          orchestration (clic, recalcul, erreurs, annulation)
   `ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES` (MNT 1 m) et
   `ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES.MNS` (MNS), format
   `image/x-bil;bits=32` : une requête HTTP renvoie toute la grille en
-  float32 big-endian (≈16 Mo pour 2000² cellules). De 1 km à 30 km de rayon :
-  1 à 2 requêtes, indépendant du rate-limit de l'API altimétrique.
+  float32 **little-endian** (≈16 Mo pour 2000² cellules). De 1 km à 30 km de
+  rayon : 1 à 2 requêtes, indépendant du rate-limit de l'API altimétrique.
+  Attention : le flux est bien little-endian (validé sur points de contrôle
+  — Mont Blanc ≈ 4757 m, Tour Eiffel ≈ 33,8 m) ; un décodage big-endian
+  donne des altitudes aberrantes (10²⁰ m).
 - **Viewshed** : balayage radial (pente apparente maximale depuis le sommet
   de l'antenne), densité angulaire proportionnelle au rapport rayon/pas pour
   éviter les trous ; masque lissé (rendu isochrone doux).
