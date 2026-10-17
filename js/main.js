@@ -65,6 +65,7 @@
     hint: document.getElementById("hint"),
     results: document.getElementById("results"),
     clickCoords: document.getElementById("click-coords"),
+    zGround: document.getElementById("z-ground"),
     resInfo: document.getElementById("res-info"),
     areaInfo: document.getElementById("area-info"),
     radius: document.getElementById("radius"),
