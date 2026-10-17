@@ -66,6 +66,7 @@
     results: document.getElementById("results"),
     clickCoords: document.getElementById("click-coords"),
     zGround: document.getElementById("z-ground"),
+    zSurface: document.getElementById("z-surface"),
     resInfo: document.getElementById("res-info"),
     areaInfo: document.getElementById("area-info"),
     radius: document.getElementById("radius"),
@@ -108,10 +109,11 @@
     RENDER.removeViewshed(map);
 
     try {
-      // 1. altitude du sol au point cliqué (MNT)
-      const zGround = await WMS_DEM.elevationAt(
-        lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNT, signal
-      );
+      // 1. altitudes au point cliqué : sol (MNT) et surface (MNS)
+      const [zGround, zSurface] = await Promise.all([
+        WMS_DEM.elevationAt(lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNT, signal),
+        WMS_DEM.elevationAt(lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNS, signal),
+      ]);
 
       // 2. grille DEM autour du point (couche selon toggle obstacles)
       UI.setProgress(0, 2, "Chargement du terrain…");
@@ -139,6 +141,7 @@
       const stepM = dem.step * Math.cos(lat);
       const area = visCount * stepM * stepM;
       el.zGround.textContent = UI.fmtAlt(zGround);
+      el.zSurface.textContent = UI.fmtAlt(zSurface);
       el.resInfo.textContent = `${stepM.toFixed(stepM < 1 ? 1 : 0)} m (${dem.width}×${dem.height})`;
       el.areaInfo.textContent = UI.fmtArea(area);
       el.results.classList.remove("hidden");
