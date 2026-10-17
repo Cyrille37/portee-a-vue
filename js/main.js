@@ -6,6 +6,26 @@
 
 (() => {
 
+  function readViewFromHash() {
+    const m = /^#(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/.exec(location.hash);
+    if (!m) return null;
+    const zoom = Math.min(20, Math.max(0, parseFloat(m[1])));
+    const lng = parseFloat(m[2]);
+    const lat = parseFloat(m[3]);
+    if (!Number.isFinite(zoom) || Math.abs(lng) > 180 || Math.abs(lat) > 90) return null;
+    return { center: [lng, lat], zoom };
+  }
+
+  function writeViewToHash() {
+    const { lng, lat } = map.getCenter();
+    const z = map.getZoom().toFixed(2);
+    const hash = `#${z}/${lat.toFixed(6)}/${lng.toFixed(6)}`;
+    if (hash !== location.hash) {
+      history.replaceState(null, "", hash);
+    }
+  }
+
+  const view = readViewFromHash();
   const map = new maplibregl.Map({
     container: "map",
     style: {
@@ -24,9 +44,16 @@
       },
       layers: [{ id: "hot", type: "raster", source: "hot" }],
     },
-    center: [2.3522, 48.8546],
-    zoom: 12,
+    center: view ? view.center : [2.3522, 48.8546],
+    zoom: view ? view.zoom : 12,
   });
+
+  map.on("moveend", writeViewToHash);
+  window.addEventListener("hashchange", () => {
+    const v = readViewFromHash();
+    if (v) map.jumpTo(v);
+  });
+  writeViewToHash();
 
   map.addControl(new maplibregl.NavigationControl());
 
