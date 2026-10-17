@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Radio Mesh — Visibilité directe</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+</head>
+<body>
+  <div id="map"></div>
+
+  <aside id="panel">
+    <h1>Radio Mesh</h1>
+    <p class="subtitle">Surface de vue directe (LiDAR / RGE ALTI)</p>
+
+    <section class="hint" id="hint">
+      Cliquez sur la carte pour placer une antenne.
+    </section>
+
+    <section class="results hidden" id="results">
+      <div class="row"><span>Altitude du point</span><strong id="z-ground">—</strong></div>
+      <div class="row"><span>Résolution</span><strong id="res-info">—</strong></div>
+      <div class="row"><span>Surface visible</span><strong id="area-info">—</strong></div>
+    </section>
+
+    <label>
+      Distance de calcul : <strong id="radius-label">1 km</strong>
+      <div class="control">
+        <input type="number" id="radius-num" min="0.1" max="30" step="0.1" value="1">
+        <span class="unit">km</span>
+      </div>
+      <input type="range" id="radius" min="0" max="1000" value="333">
+    </label>
+
+    <label class="check">
+      <input type="checkbox" id="obstacles" checked>
+      Prendre en compte les obstacles (végétation &amp; bâtiments)
+    </label>
+
+    <div class="progress hidden" id="progress">
+      <div class="progress-bar"><div id="progress-fill"></div></div>
+      <span id="progress-label">Chargement du terrain…</span>
+    </div>
+
+    <p class="status" id="status"></p>
+
+    <footer>
+      Données : <a href="https://geoservices.ign.fr/" target="_blank" rel="noopener">IGN Géoplateforme</a> ·
+      Fond : <a href="https://www.openstreetmap.fr/" target="_blank" rel="noopener">OSM France HOT</a>
+    </footer>
+  </aside>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="js/wmsDem.js"></script>
+  <script src="js/viewshed.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

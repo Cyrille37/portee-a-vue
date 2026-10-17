@@ -1,0 +1,54 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; font-family: system-ui, -apple-system, sans-serif; }
+
+#map { position: absolute; inset: 0; }
+
+#panel {
+  position: absolute;
+  top: 12px; left: 12px;
+  width: 320px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  font-size: 14px;
+  color: #222;
+}
+
+h1 { font-size: 18px; margin-bottom: 2px; }
+.subtitle { color: #666; font-size: 12px; margin-bottom: 12px; }
+
+.hint { padding: 8px 10px; background: #eef4ff; border-radius: 6px; color: #345; }
+
+.results { margin: 12px 0; border: 1px solid #e3e3e3; border-radius: 6px; padding: 6px 10px; }
+.results .row { display: flex; justify-content: space-between; padding: 3px 0; }
+.results .row span { color: #667; }
+
+label { display: block; margin: 12px 0 4px; color: #445; }
+.control { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+input[type=number] { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 6px; }
+.unit { color: #667; }
+input[type=range] { width: 100%; margin-top: 6px; }
+.check { display: flex; gap: 8px; align-items: center; }
+.check input { width: auto; }
+
+.progress { margin: 12px 0; }
+.progress-bar { height: 8px; background: #e5e5e5; border-radius: 4px; overflow: hidden; }
+#progress-fill { height: 100%; width: 0; background: #1a73e8; transition: width 0.2s; }
+#progress-label { font-size: 12px; color: #667; }
+
+.status { color: #b33; font-size: 12px; min-height: 16px; margin-top: 8px; }
+
+footer { margin-top: 12px; font-size: 11px; color: #889; }
+footer a { color: #57a; }
+
+.hidden { display: none; }
+
+#mast-marker {
+  width: 14px; height: 14px; border-radius: 50% 50% 50% 0;
+  background: #e74c3c; transform: rotate(-45deg);
+  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
