@@ -1,7 +1,7 @@
 /*
  * wmsDem.js — Téléchargement de grilles d'altitude (MNT/MNS) via le
  * WMS-Raster de la Géoplateforme (IGN) au format image/x-bil;bits=32
- * (float32 big-endian bruts, une valeur par pixel).
+ * (float32 little-endian bruts, une valeur par pixel).
  *
  * Couches : ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES     (MNT — terrain nu, 1 m)
  *           ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES.MNS (MNS — avec obstacles)
@@ -44,14 +44,14 @@ const WMS_DEM = (() => {
     return `${BASE}?${p.toString()}`;
   }
 
-  // Décode un payload BIL en Float32Array (big-endian).
+  // Décode un payload BIL en Float32Array (little-endian).
   // En WMS 1.3.0 la première ligne du flux correspond au bord sud
   // de la bbox. On retourne le tableau pour que row 0 = nord.
   function decodeBil(buffer, width, height) {
     const src = new DataView(buffer);
     const out = new Float32Array(width * height);
     for (let i = 0; i < width * height; i++) {
-      out[i] = src.getFloat32(i * 4, false); // big-endian
+      out[i] = src.getFloat32(i * 4, true); // little-endian
     }
     const flipped = new Float32Array(width * height);
     for (let r = 0; r < height; r++) {
@@ -116,7 +116,7 @@ const WMS_DEM = (() => {
       if (!res.ok) throw new Error(`WMS HTTP ${res.status}`);
       const buf = await res.arrayBuffer();
       if (buf.byteLength < 4) throw new Error("Pas de donnée altimétrique ici (hors France ?)");
-      return new DataView(buf).getFloat32(0, false);
+      return new DataView(buf).getFloat32(0, true);
     },
   };
 })();
