@@ -64,7 +64,7 @@
   const el = {
     hint: document.getElementById("hint"),
     results: document.getElementById("results"),
-    zGround: document.getElementById("z-ground"),
+    clickCoords: document.getElementById("click-coords"),
     resInfo: document.getElementById("res-info"),
     areaInfo: document.getElementById("area-info"),
     radius: document.getElementById("radius"),
@@ -134,6 +134,7 @@
         .addTo(map);
 
       // 5. panneau résultats
+      el.clickCoords.textContent = `${lngLat.lat.toFixed(6)}/${lngLat.lng.toFixed(6)}`;
       const stepM = dem.step * Math.cos(lat);
       const area = visCount * stepM * stepM;
       el.zGround.textContent = UI.fmtAlt(zGround);
