@@ -82,6 +82,7 @@
     el.radiusNum.value = (r / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
   }
   function setBusy(busy) { UI.showProgress(busy); }
+  function isBusy() { return ctrl !== null; }
   function abortCurrent() {
     if (ctrl) { ctrl.abort(); ctrl = null; }
   }
@@ -95,6 +96,7 @@
   }
 
   async function onMapClick(e) {
+    if (isBusy()) return;
     abortCurrent();
     ctrl = new AbortController();
     const signal = ctrl.signal;
@@ -116,7 +118,7 @@
       ]);
 
       // 2. grille DEM autour du point (couche selon toggle obstacles)
-      UI.setProgress(0, 2, "Chargement du terrain…");
+      UI.setBusyLabel("Chargement du terrain…");
       const dem = await WMS_DEM.fetchDem({
         cx: center3857.x, cy: center3857.y,
         half, layer: pickLayer(), signal,
@@ -124,7 +126,7 @@
       dem.layer = pickLayer();
 
       // 3. viewshed : l'altitude du point cliqué est la hauteur d'observation
-      UI.setProgress(1, 2, "Calcul de la visibilité…");
+      UI.setBusyLabel("Calcul de la visibilité…");
       const { visible, visCount } = VIEWSHED.compute(dem, center3857, zGround, radius);
       const mask = VIEWSHED.smooth(dem, visible, 1);
 
@@ -161,7 +163,7 @@
   // Recalcul : réutilise la grille si elle couvre le rayon demandé
   // et si la couche n'a pas changé ; sinon re-télécharge.
   async function recompute() {
-    if (!current) return;
+    if (!current || isBusy()) return;
     abortCurrent();
     ctrl = new AbortController();
     const signal = ctrl.signal;
@@ -180,12 +182,14 @@
     try {
       let dem = current.dem;
       if (!covered) {
+        UI.setBusyLabel("Chargement du terrain…");
         dem = await WMS_DEM.fetchDem({
           cx: center3857.x, cy: center3857.y,
           half: need, layer: pickLayer(), signal,
         });
         dem.layer = pickLayer();
       }
+      UI.setBusyLabel("Calcul de la visibilité…");
       const { visible, visCount } = VIEWSHED.compute(dem, center3857, current.zGround, radius);
       const mask = VIEWSHED.smooth(dem, visible, 1);
       RENDER.showViewshed(map, dem, mask);

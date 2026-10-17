@@ -10,6 +10,13 @@
 <body>
   <div id="map"></div>
 
+  <div id="busy-overlay" class="hidden">
+    <div class="busy-box">
+      <div class="spinner"></div>
+      <span id="busy-label">Chargement…</span>
+    </div>
+  </div>
+
   <aside id="panel">
     <h1>Radio Mesh</h1>
     <p class="subtitle">Surface de vue directe (LiDAR / RGE ALTI)</p>
@@ -39,11 +46,6 @@
       <input type="checkbox" id="obstacles" checked>
       Prendre en compte les obstacles (végétation &amp; bâtiments)
     </label>
-
-    <div class="progress hidden" id="progress">
-      <div class="progress-bar"><div id="progress-fill"></div></div>
-      <span id="progress-label">Chargement du terrain…</span>
-    </div>
 
     <p class="status" id="status"></p>
 

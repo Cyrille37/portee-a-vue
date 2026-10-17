@@ -32,13 +32,15 @@ const UI = (() => {
       : Math.round(m2).toLocaleString("fr-FR") + " m²";
   }
 
+  const busyOverlay = document.getElementById("busy-overlay");
+  const busyLabel = document.getElementById("busy-label");
+
   function showProgress(show) {
-    document.getElementById("progress").classList.toggle("hidden", !show);
-    if (show) setProgress(0, 1, "Chargement du terrain…");
+    busyOverlay.classList.toggle("hidden", !show);
+    if (show) setBusyLabel("Chargement du terrain…");
   }
-  function setProgress(done, total, label) {
-    document.getElementById("progress-fill").style.width = (100 * done / Math.max(total, 1)) + "%";
-    document.getElementById("progress-label").textContent = label;
+  function setBusyLabel(label) {
+    busyLabel.textContent = label;
   }
   function setStatus(msg) {
     document.getElementById("status").textContent = msg || "";
@@ -48,6 +50,6 @@ const UI = (() => {
     R_MIN, R_MAX,
     radiusFromSlider, sliderFromRadius,
     fmtRadius, fmtAlt, fmtArea,
-    showProgress, setProgress, setStatus,
+    showProgress, setBusyLabel, setStatus,
   };
 })();
