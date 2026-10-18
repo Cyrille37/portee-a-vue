@@ -35,7 +35,6 @@ input[type=range] { width: 100%; margin-top: 6px; }
 .check { display: flex; gap: 8px; align-items: center; margin: 12px 0 0; color: #445; }
 .check input { width: auto; }
 
-.coverage-info { color: #667; font-size: 12px; min-height: 14px; margin-top: 4px; }
 .legend { color: #889; font-size: 11px; margin-top: 4px; }
 
 .status { color: #b33; font-size: 12px; min-height: 16px; margin-top: 8px; }

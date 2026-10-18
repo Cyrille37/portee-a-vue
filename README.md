@@ -22,8 +22,6 @@ js/alti.js           API Altimétrie Géoplateforme
                     (data.geopf.fr/altimetrie) : MNT + MNS + MNH
                     en une requête (LiDAR HD, repli RGE ALTI)
 js/ui.js            formats FR, progression, statut
-js/lidarCoverage.js couverture LiDAR HD (dalles 1 km diffusées) via WFS
-                    Géoplateforme, cache LRU mémoire par tuile 0.5°
 js/main.js          orchestration (clic, couverture, marqueur, erreurs, annulation)
 ```
 
@@ -37,10 +35,11 @@ js/main.js          orchestration (clic, couverture, marqueur, erreurs, annulati
   `ign_rge_alti_wld` (MNT seul) hors couverture LiDAR HD.
 - **Limite de service** : 5 requêtes/s par IP (largement suffisant pour
   des clics manuels).
-- **Couverture LiDAR HD** : couche WFS `IGNF_LIDAR-HD_METADONNEE:metadata`
-  (emprises des dalles 1×1 km diffusées), affichée en bleu translucide,
-  chargée par bbox du viewport (zoom ≥ 9), plafonnée à 5000 features par
-  requête. Zone non couverte → repli RGE ALTI et « Hauteur : n.d. ».
+- **Couverture LiDAR HD** : tuiles vectorielles TMS Géoplateforme
+  `IGNF_LIDAR-HD_METADONNEE` (emprises des dalles 1×1 km diffusées,
+  généralisées aux basses échelles), affichées en bleu translucide dès le
+  zoom 6 (source vector MapLibre, schéma XYZ standard).
+  Zone non couverte → repli RGE ALTI et « Hauteur : n.d. ».
 
 ## Limites connues
 
