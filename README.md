@@ -1,4 +1,4 @@
-# Radio Mesh — Altitude d'un point (LiDAR)
+# Altitude d'un point (LiDAR)
 
 Outil web vanilla JS + MapLibre GL : un clic sur la carte affiche
 l'altitude du point à partir des données LiDAR HD / RGE ALTI® de l'IGN
