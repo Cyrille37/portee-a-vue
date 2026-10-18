@@ -12,8 +12,8 @@
     const m = /^#(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)/.exec(location.hash);
     if (!m) return null;
     const zoom = Math.min(20, Math.max(0, parseFloat(m[1])));
-    const lng = parseFloat(m[2]);
-    const lat = parseFloat(m[3]);
+    const lat = parseFloat(m[2]);
+    const lng = parseFloat(m[3]);
     if (!Number.isFinite(zoom) || Math.abs(lng) > 180 || Math.abs(lat) > 90) return null;
     return { center: [lng, lat], zoom };
   }
