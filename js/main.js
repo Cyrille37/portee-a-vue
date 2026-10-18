@@ -1,6 +1,7 @@
 /*
  * main.js — Orchestration : carte MapLibre (fond OSM France HOT),
- * clic -> altitude du point (MNT sol, MNS surface, hauteur d'obstacle).
+ * clic -> altitude du point (MNT sol, MNS surface, MNH hauteur d'obstacle)
+ * via l'API Altimétrie de la Géoplateforme.
  */
 "use strict";
 
@@ -91,12 +92,9 @@
     UI.setStatus("");
 
     try {
-      // altitudes au point cliqué : sol (MNT) et surface (MNS)
+      // altitudes au point cliqué : sol (MNT), surface (MNS), hauteur (MNH)
       UI.setBusyLabel("Recherche de l'altitude…");
-      const [zGround, zSurface] = await Promise.all([
-        WMS_DEM.elevationAt(lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNT, signal),
-        WMS_DEM.elevationAt(lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNS, signal),
-      ]);
+      const { zGround, zSurface, zHeight } = await ALTI.elevationAt(lngLat.lng, lngLat.lat, signal);
 
       // marqueur
       if (marker) marker.remove();
@@ -108,7 +106,7 @@
       el.clickCoords.textContent = `${lngLat.lat.toFixed(6)}/${lngLat.lng.toFixed(6)}`;
       el.zGround.textContent = UI.fmtAlt(zGround);
       el.zSurface.textContent = UI.fmtAlt(zSurface);
-      el.zHeight.textContent = UI.fmtAlt(zSurface - zGround);
+      el.zHeight.textContent = UI.fmtAlt(zHeight);
       el.results.classList.remove("hidden");
       el.hint.classList.add("hidden");
 
