@@ -47,6 +47,29 @@ Référence des services de la Géoplateforme (IGN) exploitables pour de
 prochaines évolutions. Tous sont accessibles sans clé, en open data
 (Licence Ouverte Etalab 2.0) — vérifier les limites d'usage par service.
 
+### Caractéristiques des produits altimétriques
+
+| Produit | Pas (résolution) | Précision | Contenu | Couverture |
+|---|---|---|---|---|
+| **LiDAR HD** (nuage de points) | ≥ 10 impulsions/m² (5 au-dessus de 3 200 m) | altimétrique ~10 cm, planimétrique ~5 cm (classification) | points classés sol/eau/végétation/bâtiments/ponts | France métrop. + DROM (hors Guyane), programme completé d'ici 2026 |
+| **MNT LiDAR HD** | maillage 50 cm | « Pas de 50 cm » | terrain nu (points sol + eau + virtuels) | suit la diffusion LiDAR HD |
+| **MNS LiDAR HD** | maillage 50 cm | « Pas de 50 cm » | terrain + végétation, bâtiments, ouvrages d'art | suit la diffusion LiDAR HD |
+| **MNH LiDAR HD** | maillage 50 cm | « Pas de 50 cm » | hauteur surface−sol (MNS−MNT) | suit la diffusion LiDAR HD |
+| **RGE ALTI®** | maillage 1 m | ~1 m (selon source) | MNT terrain nu | France entière (métropole + DOM/COM), stable |
+
+Autres caractéristiques utiles :
+
+- **Dalles de diffusion** : 1×1 km (Lambert-93 pour la métropole,
+  RGR92UTM40S pour La Réunion) ; identifiées par `coordonnees_nw` ;
+  téléchargeables en GeoTIFF par dalle (cf. URLs dans les métadonnées).
+- **Systèmes de référence** : altimétrie IGN69 / IGN78 (normale),
+  géopositionnement RGF93 / Lambert-93 (métropole).
+- **Reprojection** : les ressources `_mono_wld` « avec interpolation » sont
+  reprojettées en projection mondiale — des valeurs interpolées peuvent
+  apparaître aux transitions zones sans/avec données.
+- **Bbox des ressources** : approximatives — la disponibilité réelle se
+  constate par la sentinelle `z = -99999` ou la couche de couverture.
+
 ### Altimétrie ponctuelle — API Altimétrie (utilisée)
 
 - `https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json`
