@@ -41,6 +41,74 @@ js/main.js          orchestration (clic, couverture, marqueur, erreurs, annulati
   zoom 6 (source vector MapLibre, schéma XYZ standard).
   Zone non couverte → repli RGE ALTI et « Hauteur : n.d. ».
 
+## Sources de données complémentaires
+
+Référence des services de la Géoplateforme (IGN) exploitables pour de
+prochaines évolutions. Tous sont accessibles sans clé, en open data
+(Licence Ouverte Etalab 2.0) — vérifier les limites d'usage par service.
+
+### Altimétrie ponctuelle — API Altimétrie (utilisée)
+
+- `https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json`
+  (GET/POST, JSON/XML ; **5 req/s par IP**) ; `zonly`, `measures`,
+  `elevationLine` (profil en long, `sampling` jusqu'à 5000 points,
+  `profile_mode=accurate`).
+- Ressources : `ign_lidar_hd_mnx_mono_wld` (LiDAR HD 50 cm, MNT+MNS+MNH en
+  une requête, avec interpolation), `ign_rge_alti_wld` (RGE ALTI 1 m, MNT
+  seul, couverture France entière), `ign_lidar_hd_mnt_mono_wld`, …
+- Liste complète : `https://data.geopf.fr/altimetrie/resources`.
+  Hors couverture : sentinelle `z = -99999`.
+- Cas particulier : `IGNF_LIDARHD_MNX_WLD` et `ALTIMETRIE` (sans
+  interpolation) renvoient `-99999` sur des zones incluses dans leur bbox
+  déclarée — la bbox ne préjuge pas de la disponibilité réelle.
+
+### Couverture LiDAR HD — tuiles vectorielles TMS (utilisées)
+
+- `https://data.geopf.fr/tms/1.0.0/IGNF_LIDAR-HD_METADONNEE/{z}/{x}/{y}.pbf`
+  (MVT, EPSG:3857, tuiles 256 px, **schéma XYZ standard** origine
+  haut-gauche malgré le nom « TMS** — l'inversion `{-y}` renvoie 404).
+  Zooms 6 à 14+, couche interne `metadata` (dalle = feature 1×1 km avec
+  `code_mission`, `date_*`, `coordonnees_nw`, URLs de téléchargement).
+- Catalogue TMS : `https://data.geopf.fr/tms/1.0.0/` (826 TileMaps).
+- Variantes par produit : `IGNF_MNT-LIDAR-HD-produit` (dalles MNT),
+  `IGNF_MNS-LIDAR-HD-produit`, `IGNF_MNH-LIDAR-HD-produit`,
+  `IGNF_NUAGES-DE-POINTS-LIDAR-HD-produit`, `*-chantier` (blocs),
+  `PLANIGN.LIDAR.TERRAIN` (fond de carte dérivé du LiDAR HD).
+
+### Couverture LiDAR HD — WFS équivalent
+
+- `https://data.geopf.fr/wfs` — `TYPENAMES=IGNF_LIDAR-HD_METADONNEE:metadata`
+  (`GetFeature` JSON, `BBOX` en ordre **lat,lon** avec
+  `SRSNAME=EPSG:4326`, **sans** suffixe CRS dans le BBOX ; `COUNT`/`STARTINDEX`
+  pour paginer — troncature spatiale silencieuse si `COUNT` trop petit).
+- Utile pour un test ponctuel « ce point est-il couvert ? » ou télécharger
+  les emprises d'une zone précise.
+
+### Grilles d'altitude — WMS-Raster (utilisé précédemment, archivé)
+
+- `https://data.geopf.fr/wms-r` — GetMap format `image/x-bil;bits=32`
+  (float32 **little-endian**, 1 valeur/pixel ; WMS 1.3.0 : première ligne =
+  bord sud). Couches : `ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES` (MNT 1 m),
+  `...HIGHRES.MNS` (MNS), `IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.*`
+  (MNT/MNS/MNH LiDAR HD, variantes LAMB93/RGR92UTM40S/SHADOW/WGS84G),
+  `IGNF_LIDAR-HD_CLASS`, `IGNF_LIDAR-HD_DENSITE-SOL`/`-SURSOL`.
+- Les features `metadata` du WFS/TMS embarquent aussi des URLs
+  `image/geotiff` de téléchargement direct par dalle (MNT/MNS/MNH/NPL).
+- Un GetMap avec `LAYERS` multiples (MNT+MNS) n'a **pas** été validé —
+  à tester avant usage.
+
+### Divers
+n
+- Carte officielle d'avancement LiDAR HD : macarte.ign.fr
+  (`diffusionMNxLiDARHD`, `Avancement-Programme-LIDAR-HD`) — s'appuie sur
+  les flux ci-dessus.
+- Nuages de points LiDAR HD (classification, densité) : couches WMS-R
+  `IGNF_LIDAR-HD_*` et TMS `IGNF_NUAGES-DE-POINTS-LIDAR-HD-*` ; fiche :
+  geoservices.ign.fr/lidarhd.
+- Ordre des axes : WFS 2.0/EPSG:4326 = (lat, lon) ; WMS 1.3.0/EPSG:4326 =
+  (lat, lon) — d'où CRS:84 pour les requêtes ponctuelles ; TMS = XYZ (lon
+  puis lat, origine haut-gauche).
+
 ## Limites connues
 
 - Couverture : France métropolitaine (RGE ALTI®). Hors zone, erreur explicite.
