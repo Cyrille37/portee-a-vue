@@ -32,6 +32,12 @@ label { display: block; margin: 12px 0 4px; color: #445; }
 input[type=number] { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 6px; }
 .unit { color: #667; }
 input[type=range] { width: 100%; margin-top: 6px; }
+.check { display: flex; gap: 8px; align-items: center; margin: 12px 0 0; color: #445; }
+.check input { width: auto; }
+
+.coverage-info { color: #667; font-size: 12px; min-height: 14px; margin-top: 4px; }
+.legend { color: #889; font-size: 11px; margin-top: 4px; }
+
 .status { color: #b33; font-size: 12px; min-height: 16px; margin-top: 8px; }
 
 footer { margin-top: 12px; font-size: 11px; color: #889; }

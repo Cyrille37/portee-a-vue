@@ -1,5 +1,6 @@
 /*
  * main.js — Orchestration : carte MapLibre (fond OSM France HOT),
+ * couverture LiDAR HD (dalles 1 km, WFS Géoplateforme),
  * clic -> altitude du point (MNT sol, MNS surface, MNH hauteur d'obstacle)
  * via l'API Altimétrie de la Géoplateforme.
  */
@@ -68,6 +69,8 @@
     zHeight: document.getElementById("z-height"),
     zGround: document.getElementById("z-ground"),
     zSurface: document.getElementById("z-surface"),
+    coverageCheck: document.getElementById("coverage-check"),
+    coverageInfo: document.getElementById("coverage-info"),
   };
 
   function setBusy(busy) { UI.showProgress(busy); }
@@ -80,6 +83,87 @@
     d.id = "click-marker";
     return d;
   }
+
+  // ---- Couverture LiDAR HD -----------------------------------------
+
+  const COVERAGE_SOURCE = "lidar-coverage-source";
+  const COVERAGE_FILL = "lidar-coverage-fill";
+  const COVERAGE_LINE = "lidar-coverage-line";
+  let coverageCtrl = null;     // AbortController du chargement de couverture
+  let coverageVisible = el.coverageCheck.checked;
+
+  function viewBBox() {
+    const b = map.getBounds();
+    return { w: b.getWest(), s: b.getSouth(), e: b.getEast(), n: b.getNorth() };
+  }
+
+  function coverageBusy(busy) {
+    el.coverageInfo.textContent = busy ? "Chargement de la couverture…" : "";
+    setBusy(busy);
+  }
+
+  function refreshCoverageSource() {
+    if (map.getSource(COVERAGE_SOURCE)) {
+      map.getSource(COVERAGE_SOURCE).setData(LIDAR_COVERAGE.getCachedFeatures());
+    }
+  }
+
+  async function updateCoverage() {
+    if (!coverageVisible) return;
+    if (map.getZoom() < LIDAR_COVERAGE.MIN_ZOOM) {
+      el.coverageInfo.textContent = "Zoomer pour voir la couverture LiDAR HD.";
+      return;
+    }
+    const { w, s, e, n } = viewBBox();
+    if (LIDAR_COVERAGE.has(w, s, e, n)) return;
+
+    if (coverageCtrl) coverageCtrl.abort();
+    coverageCtrl = new AbortController();
+    coverageBusy(true);
+    try {
+      await LIDAR_COVERAGE.loadBBox(w, s, e, n, { signal: coverageCtrl.signal });
+      refreshCoverageSource();
+      coverageBusy(false);
+      coverageCtrl = null;
+    } catch (err) {
+      coverageBusy(false);
+      coverageCtrl = null;
+      if (err.name !== "AbortError") {
+        el.coverageInfo.textContent = "Erreur couverture : " + (err.message || err);
+      }
+    }
+  }
+
+  function setCoverageVisible(visible) {
+    coverageVisible = visible;
+    if (!map.getSource(COVERAGE_SOURCE)) return;
+    for (const id of [COVERAGE_FILL, COVERAGE_LINE]) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+    }
+    if (visible) updateCoverage();
+    else el.coverageInfo.textContent = "";
+  }
+
+  function addCoverageLayers() {
+    map.addSource(COVERAGE_SOURCE, {
+      type: "geojson",
+      data: LIDAR_COVERAGE.getCachedFeatures(),
+    });
+    map.addLayer({
+      id: COVERAGE_FILL,
+      type: "fill",
+      source: COVERAGE_SOURCE,
+      paint: { "fill-color": "#1a73e8", "fill-opacity": 0.15 },
+    });
+    map.addLayer({
+      id: COVERAGE_LINE,
+      type: "line",
+      source: COVERAGE_SOURCE,
+      paint: { "line-color": "#1a73e8", "line-width": 0.5, "line-opacity": 0.5 },
+    });
+  }
+
+  // ---- Clic -> altitudes --------------------------------------------
 
   async function onMapClick(e) {
     if (isBusy()) return;
@@ -106,7 +190,11 @@
       el.clickCoords.textContent = `${lngLat.lat.toFixed(6)}/${lngLat.lng.toFixed(6)}`;
       el.zGround.textContent = UI.fmtAlt(zGround);
       el.zSurface.textContent = UI.fmtAlt(zSurface);
-      el.zHeight.textContent = UI.fmtAlt(zHeight);
+      if (zHeight === null) {
+        el.zHeight.textContent = "n.d. (hors LiDAR HD)";
+      } else {
+        el.zHeight.textContent = UI.fmtAlt(zHeight);
+      }
       el.results.classList.remove("hidden");
       el.hint.classList.add("hidden");
 
@@ -121,7 +209,14 @@
   }
 
   map.on("load", () => {
+    addCoverageLayers();
+    setCoverageVisible(coverageVisible);
     map.on("click", onMapClick);
+    map.on("moveend", updateCoverage);
+  });
+
+  el.coverageCheck.addEventListener("change", () => {
+    setCoverageVisible(el.coverageCheck.checked);
   });
 
 })();
