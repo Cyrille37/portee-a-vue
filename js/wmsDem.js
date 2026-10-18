@@ -1,14 +1,9 @@
 /*
- * wmsDem.js — Téléchargement de grilles d'altitude (MNT/MNS) via le
- * WMS-Raster de la Géoplateforme (IGN) au format image/x-bil;bits=32
- * (float32 little-endian bruts, une valeur par pixel).
+ * wmsDem.js — Altitude ponctuelle (MNT/MNS) via le WMS-Raster de la
+ * Géoplateforme (IGN) au format image/x-bil;bits=32 (float32 little-endian).
  *
- * Couches : ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES     (MNT — terrain nu, 1 m)
+ * Couches : ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES     (MNT — terrain nu)
  *           ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES.MNS (MNS — avec obstacles)
- * CRS de travail : EPSG:3857 (Web Mercator, natif MapLibre).
- *
- * Cache : les réponses WMS sont mises en Cache API (persistantes entre
- * les sessions) via leur URL déterministe, plus un LRU mémoire au-dessus.
  */
 "use strict";
 
@@ -17,64 +12,6 @@ const WMS_DEM = (() => {
   const BASE = "https://data.geopf.fr/wms-r";
   const LAYER_MNT = "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES";
   const LAYER_MNS = "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES.MNS";
-  const MAX_TILE = 4000;          // garde-fou < limite serveur 5010
-  const QUANT = 1000;             // maille fixe de quantification des bbox (m EPSG:3857)
-  const MAX_CELLS = 16e6;          // plafond mémoire ~64 Mo float32
-  const CACHE_NAME = "portee-a-vue-wms-dem-v1";
-
-  // LRU mémoire : clé = URL WMS (déterministe)
-  const cache = new Map();
-  const CACHE_MAX = 6;
-  function cacheGet(key) {
-    if (!cache.has(key)) return undefined;
-    const v = cache.get(key);
-    cache.delete(key); cache.set(key, v);   // refresh LRU
-    return v;
-  }
-  function cachePut(key, value) {
-    if (cache.has(key)) cache.delete(key);
-    cache.set(key, value);
-    if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
-  }
-
-  // ---- Cache API (persistant) --------------------------------------
-  let httpCache = null;
-  let httpCacheWarned = false;
-  async function httpCacheOpen() {
-    if (!("caches" in window)) {
-      if (!httpCacheWarned) {
-        httpCacheWarned = true;
-        console.warn("Cache API indisponible (contexte non sécurisé ?) : pas de persistance entre sessions.");
-      }
-      return null;
-    }
-    if (!httpCache) {
-      try { httpCache = await caches.open(CACHE_NAME); }
-      catch { return null; }
-    }
-    return httpCache;
-  }
-  async function httpCacheGet(url) {
-    const c = await httpCacheOpen();
-    if (!c) return null;
-    try {
-      const res = await c.match(url);
-      return res ? await res.arrayBuffer() : null;
-    } catch { return null; }
-  }
-  async function httpCachePut(url, buffer) {
-    const c = await httpCacheOpen();
-    if (!c) return;
-    try { await c.put(url, new Response(buffer.slice(0))); } catch {}
-  }
-
-  async function clearCache() {
-    cache.clear();
-    httpCache = null;
-    if ("caches" in window) {
-      try { await caches.delete(CACHE_NAME); } catch {}
-    }
-  }
 
   function buildUrl(layer, bbox, width, height, crs = "EPSG:3857") {
     const p = new URLSearchParams({
@@ -88,111 +25,20 @@ const WMS_DEM = (() => {
     return `${BASE}?${p.toString()}`;
   }
 
-  // Décode un payload BIL en Float32Array (little-endian).
-  // En WMS 1.3.0 la première ligne du flux correspond au bord sud
-  // de la bbox. On retourne le tableau pour que row 0 = nord.
-  function decodeBil(buffer, width, height) {
-    const src = new DataView(buffer);
-    const out = new Float32Array(width * height);
-    for (let i = 0; i < width * height; i++) {
-      out[i] = src.getFloat32(i * 4, true); // little-endian
-    }
-    const flipped = new Float32Array(width * height);
-    for (let r = 0; r < height; r++) {
-      const srcRow = height - 1 - r;
-      flipped.set(out.subarray(srcRow * width, (srcRow + 1) * width), r * width);
-    }
-    return flipped;
-  }
-
-  async function fetchTile(url, width, height, signal) {
-    let buf = await httpCacheGet(url);
-    if (!buf) {
-      console.debug("WMS requête réseau (miss cache) :", url);
-      const res = await fetch(url, { signal });
-      if (!res.ok) throw new Error(`WMS HTTP ${res.status}`);
-      buf = await res.arrayBuffer();
-      if (buf.byteLength < width * height * 4) {
-        const txt = new TextDecoder().decode(buf.slice(0, 500));
-        throw new Error(`Réponse WMS inattendue : ${txt.slice(0, 200)}`);
-      }
-      await httpCachePut(url, buf);
-    }
-    if (buf.byteLength < width * height * 4) {
-      throw new Error("Réponse WMS en cache incomplète");
-    }
-    return decodeBil(buf, width, height);
-  }
-
-  /*
-   * Grille d'altitude centrée sur (cx, cy) [EPSG:3857], demi-largeur
-   * `half` en mètres. Retourne :
-   * { grid: Float32Array, width, height, bbox: [w,s,e,n], step }
-   * avec row 0 = nord, col 0 = ouest.
-   *
-   * La bbox est ancrée sur une grille quantifiée fixe de maille QUANT
-   * (1 km en EPSG:3857), indépendante du rayon : tous les clics dont la
-   * zone touche les mêmes mailles produisent exactement la même URL
-   * → hit cache sans requête réseau, même entre rayons différents.
-   *
-   * Précision conservée : ~1 m/pixel tant que la bbox tient sous la
-   * limite serveur (MAX_TILE) et mémoire (MAX_CELLS) ; au-delà, le pas
-   * grossit uniformément.
-   */
-  async function fetchDem({ cx, cy, half, layer, signal, onProgress }) {
-    const w = Math.floor((cx - half) / QUANT) * QUANT;
-    const s = Math.floor((cy - half) / QUANT) * QUANT;
-    const e = Math.ceil((cx + half) / QUANT) * QUANT;
-    const n = Math.ceil((cy + half) / QUANT) * QUANT;
-
-    const spanX = e - w, spanY = n - s;
-    let step = Math.max(1, Math.max(spanX, spanY) / MAX_TILE);
-    let width = Math.ceil(spanX / step), height = Math.ceil(spanY / step);
-    while (width * height > MAX_CELLS) {
-      step *= 1.25;
-      width = Math.ceil(spanX / step);
-      height = Math.ceil(spanY / step);
-    }
-    const bbox = [w, s, w + width * step, s + height * step];
-
-    const url = buildUrl(layer, bbox, width, height);
-    const hit = cacheGet(url);
-    if (hit) {
-      console.debug("WMS cache mémoire :", url);
-      return hit;
-    }
-
-    if (onProgress) onProgress(0, 1);
-    const grid = await fetchTile(url, width, height, signal);
-    if (onProgress) onProgress(1, 1);
-
-    const result = { grid, width, height, bbox, step };
-    cachePut(url, result);
-    return result;
-  }
-
   // Altitude ponctuelle via une requête BIL 1x1.
   // CRS:84 = WGS84 axes (lon, lat) — l'ordre d'axe de EPSG:4326
   // en WMS 1.3.0 est (lat, lon), d'où CRS:84 pour éviter l'inversion.
-  // Coordonnées quantifiées à ~1 m (1e-5°) pour mutualiser le cache.
   async function elevationAt(lon, lat, layer = LAYER_MNT, signal) {
-    const lonQ = Math.round(lon * 1e5) / 1e5;
-    const latQ = Math.round(lat * 1e5) / 1e5;
-    const url = buildUrl(layer, [lonQ, latQ, lonQ + 1e-7, latQ + 1e-7], 1, 1, "CRS:84");
-    let buf = await httpCacheGet(url);
-    if (buf) console.debug("WMS cache HTTP :", url);
-    if (!buf) {
-      const res = await fetch(url, { signal });
-      if (!res.ok) throw new Error(`WMS HTTP ${res.status}`);
-      buf = await res.arrayBuffer();
-      if (buf.byteLength < 4) throw new Error("Pas de donnée altimétrique ici (hors France ?)");
-      await httpCachePut(url, buf);
-    }
+    const url = buildUrl(layer, [lon, lat, lon + 1e-7, lat + 1e-7], 1, 1, "CRS:84");
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`WMS HTTP ${res.status}`);
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength < 4) throw new Error("Pas de donnée altimétrique ici (hors France ?)");
     return new DataView(buf).getFloat32(0, true);
   }
 
   return {
     LAYER_MNT, LAYER_MNS,
-    fetchDem, elevationAt, clearCache,
+    elevationAt,
   };
 })();

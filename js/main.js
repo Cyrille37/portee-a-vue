@@ -1,6 +1,6 @@
 /*
  * main.js — Orchestration : carte MapLibre (fond OSM France HOT),
- * clic -> altitude + viewshed, réglages (rayon, antenne, obstacles).
+ * clic -> altitude du point (MNT sol, MNS surface, hauteur d'obstacle).
  */
 "use strict";
 
@@ -58,7 +58,6 @@
   map.addControl(new maplibregl.NavigationControl());
 
   let marker = null;
-  let current = null;          // { lngLat, dem, zGround }
   let ctrl = null;             // AbortController du chargement en cours
 
   const el = {
@@ -68,31 +67,16 @@
     zHeight: document.getElementById("z-height"),
     zGround: document.getElementById("z-ground"),
     zSurface: document.getElementById("z-surface"),
-    resInfo: document.getElementById("res-info"),
-    areaInfo: document.getElementById("area-info"),
-    radius: document.getElementById("radius"),
-    radiusNum: document.getElementById("radius-num"),
-    radiusLabel: document.getElementById("radius-label"),
-    obstacles: document.getElementById("obstacles"),
   };
 
-  function getRadius() { return UI.radiusFromSlider(+el.radius.value); }
-  function updateRadiusLabel() {
-    const r = getRadius();
-    el.radiusLabel.textContent = UI.fmtRadius(r);
-    el.radiusNum.value = (r / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 2 });
-  }
   function setBusy(busy) { UI.showProgress(busy); }
   function isBusy() { return ctrl !== null; }
   function abortCurrent() {
     if (ctrl) { ctrl.abort(); ctrl = null; }
   }
-  function pickLayer() {
-    return el.obstacles.checked ? WMS_DEM.LAYER_MNS : WMS_DEM.LAYER_MNT;
-  }
-  function mastElement() {
+  function clickMarkerElement() {
     const d = document.createElement("div");
-    d.id = "mast-marker";
+    d.id = "click-marker";
     return d;
   }
 
@@ -102,56 +86,32 @@
     ctrl = new AbortController();
     const signal = ctrl.signal;
     const lngLat = e.lngLat;
-    const radius = getRadius();
-    const lat = lngLat.lat * Math.PI / 180;
-    const center3857 = maplibregl.MercatorCoordinate.fromLngLat(lngLat, 0);
-    const half = radius / Math.cos(lat);   // mètres réels -> mètres Mercator
 
     setBusy(true);
     UI.setStatus("");
-    RENDER.removeViewshed(map);
 
     try {
-      // 1. altitudes au point cliqué : sol (MNT) et surface (MNS)
+      // altitudes au point cliqué : sol (MNT) et surface (MNS)
+      UI.setBusyLabel("Recherche de l'altitude…");
       const [zGround, zSurface] = await Promise.all([
         WMS_DEM.elevationAt(lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNT, signal),
         WMS_DEM.elevationAt(lngLat.lng, lngLat.lat, WMS_DEM.LAYER_MNS, signal),
       ]);
 
-      // 2. grille DEM autour du point (couche selon toggle obstacles)
-      UI.setBusyLabel("Chargement du terrain…");
-      const dem = await WMS_DEM.fetchDem({
-        cx: center3857.x, cy: center3857.y,
-        half, layer: pickLayer(), signal,
-      });
-      dem.layer = pickLayer();
-
-      // 3. viewshed : l'altitude du point cliqué est la hauteur d'observation
-      UI.setBusyLabel("Calcul de la visibilité…");
-      const { visible, visCount } = VIEWSHED.compute(dem, center3857, zGround, radius);
-      const mask = VIEWSHED.smooth(dem, visible, 1);
-
-      // 4. rendu + marqueur
-      RENDER.showViewshed(map, dem, mask);
-      RENDER.showRadius(map, [lngLat.lng, lngLat.lat], radius);
+      // marqueur
       if (marker) marker.remove();
-      marker = new maplibregl.Marker({ element: mastElement() })
+      marker = new maplibregl.Marker({ element: clickMarkerElement() })
         .setLngLat(lngLat)
         .addTo(map);
 
-      // 5. panneau résultats
+      // panneau résultats
       el.clickCoords.textContent = `${lngLat.lat.toFixed(6)}/${lngLat.lng.toFixed(6)}`;
-      el.zHeight.textContent = UI.fmtAlt(zSurface - zGround);
-      const stepM = dem.step * Math.cos(lat);
-      const area = visCount * stepM * stepM;
       el.zGround.textContent = UI.fmtAlt(zGround);
       el.zSurface.textContent = UI.fmtAlt(zSurface);
-      el.resInfo.textContent = `${stepM.toFixed(stepM < 1 ? 1 : 0)} m (${dem.width}×${dem.height})`;
-      el.areaInfo.textContent = UI.fmtArea(area);
+      el.zHeight.textContent = UI.fmtAlt(zSurface - zGround);
       el.results.classList.remove("hidden");
       el.hint.classList.add("hidden");
 
-      current = { lngLat, dem, zGround };
       ctrl = null;
       setBusy(false);
     } catch (err) {
@@ -162,73 +122,8 @@
     }
   }
 
-  // Recalcul : réutilise la grille si elle couvre le rayon demandé
-  // et si la couche n'a pas changé ; sinon re-télécharge.
-  async function recompute() {
-    if (!current || isBusy()) return;
-    abortCurrent();
-    ctrl = new AbortController();
-    const signal = ctrl.signal;
-    const radius = getRadius();
-    const center3857 = maplibregl.MercatorCoordinate.fromLngLat(current.lngLat, 0);
-    const lat = current.lngLat.lat * Math.PI / 180;
-    const need = radius / Math.cos(lat);
-
-    const [w, s, e, n] = current.dem.bbox;
-    const covered = current.dem.layer === pickLayer() &&
-      center3857.x - need >= w && center3857.x + need <= e &&
-      center3857.y - need >= s && center3857.y + need <= n;
-
-    setBusy(true);
-    UI.setStatus("");
-    try {
-      let dem = current.dem;
-      if (!covered) {
-        UI.setBusyLabel("Chargement du terrain…");
-        dem = await WMS_DEM.fetchDem({
-          cx: center3857.x, cy: center3857.y,
-          half: need, layer: pickLayer(), signal,
-        });
-        dem.layer = pickLayer();
-      }
-      UI.setBusyLabel("Calcul de la visibilité…");
-      const { visible, visCount } = VIEWSHED.compute(dem, center3857, current.zGround, radius);
-      const mask = VIEWSHED.smooth(dem, visible, 1);
-      RENDER.showViewshed(map, dem, mask);
-      RENDER.showRadius(map, [current.lngLat.lng, current.lngLat.lat], radius);
-
-      const stepM = dem.step * Math.cos(lat);
-      el.resInfo.textContent = `${stepM.toFixed(stepM < 1 ? 1 : 0)} m (${dem.width}×${dem.height})`;
-      el.areaInfo.textContent = UI.fmtArea(visCount * stepM * stepM);
-      current.dem = dem;
-      setBusy(false);
-    } catch (err) {
-      setBusy(false);
-      if (err.name !== "AbortError") UI.setStatus("Erreur : " + (err.message || err));
-    }
-  }
-
   map.on("load", () => {
     map.on("click", onMapClick);
   });
 
-  el.radius.addEventListener("input", updateRadiusLabel);
-  el.radius.addEventListener("change", () => { updateRadiusLabel(); recompute(); });
-  el.radiusNum.addEventListener("change", () => {
-    const km = parseFloat(el.radiusNum.value.replace(",", "."));
-    if (Number.isFinite(km) && km > 0) {
-      el.radius.value = UI.sliderFromRadius(Math.min(30000, Math.max(100, km * 1000)));
-      updateRadiusLabel();
-      recompute();
-    }
-  });
-  el.obstacles.addEventListener("change", recompute);
-
-  document.getElementById("clear-cache").addEventListener("click", async () => {
-    if (isBusy()) { UI.setStatus("Chargement en cours, réessayez après."); return; }
-    await WMS_DEM.clearCache();
-    UI.setStatus("Cache vidé.");
-  });
-
-  updateRadiusLabel();
 })();
