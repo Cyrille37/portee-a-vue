@@ -7,12 +7,12 @@ produit="${1:?usage: download.sh <MNS|MNT> <XXXX_YYYY>}"
 dalle="${2:?usage: download.sh <MNS|MNT> <XXXX_YYYY>}"
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-X="${dalle%%_*}"; Y="${dalle##*_}"
+X="${dalle%%_*}"; Y="${dalle##*_}"   # nom = coin NW (ouest X km, nord Y km)
 
 URL="https://data.geopf.fr/wms-r?SERVICE=WMS&VERSION=1.3.0&EXCEPTIONS=text/xml&REQUEST=GetMap"
 URL+="&LAYERS=IGNF_LIDAR-HD_${produit}_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93"
 URL+="&FORMAT=image/geotiff&STYLES=&CRS=EPSG:2154"
-URL+="&BBOX=${X}999.75,${Y}000.25,$((10#${X}+1))999.75,$((10#${Y}+1))000.25"
+URL+="&BBOX=${X}999.75,$((10#${Y}-1))000.25,$((10#${X}+1))999.75,${Y}000.25"
 URL+="&WIDTH=2000&HEIGHT=2000"
 URL+="&FILENAME=LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 

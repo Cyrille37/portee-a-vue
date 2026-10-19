@@ -118,8 +118,15 @@ Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6705_MNS_O_0M50_LAMB93_IGN69.
   manquante arrête l'ingestion plutôt que de supprimer une source non
   transformée.
 
-## Vérifications faites sur la dalle centrale (0525_6705)
-GeoTIFF 2000×2000 float32, emprise exacte 525999.75–526999.75 /
-6705000.25–6706000.25, z sol ≈ 101 m NGF au point Europe (MNS = MNT :
-point en rue, pas de sursol), max MNS 149 m (bâti), max MNT 106 m.
+## Vérifications faites sur la dalle du point (0525_6706, BBOX
+524999.75–525999.75 / 6705000.25–6706000.25)
+GeoTIFF 2000×2000 float32, z sol = 99,35 m NGF au point Europe
+(MNS = MNT : point en rue, pas de sursol), max MNS 129 m (bâti),
+max MNT 103 m — croisé avec l'API altimétrie IGN : 99,33 m.
+
+⚠ Correction de convention : le nom de dalle encode le coin **NW**
+(ouest X km, nord Y km), pas le coin sud-ouest. La première version des
+scripts décalait le BBOX de +1 km en X et Y ; les dalles étaient
+téléchargées 1 km trop à l'est et au nord. Corrigé et validé par croisement
+tuile / API altimétrie (99,35 vs 99,33 m).
 

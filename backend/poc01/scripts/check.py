@@ -18,7 +18,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # backend/
 DATA = ROOT / "data"
-DALLES = ["0524_6704", "0524_6705", "0525_6704", "0525_6705", "0525_6706", "0526_6704", "0526_6705"]
+DALLES = ["0524_6705", "0524_6706", "0525_6705", "0525_6706", "0525_6707", "0526_6705", "0526_6706"]
 EUROPE_L93 = (525363.55, 6705039.73)
 ERREURS = []
 
@@ -59,10 +59,10 @@ def main():
             check(abs(gt[1] - 2.0) < 1e-9 and abs(gt[5] + 2.0) < 1e-9,
                   f"{nom}: pas {gt[1]},{gt[5]} != 2 m")
             X, Y = int(dalle.split("_")[0]), int(dalle.split("_")[1])
-            # le gdalwarp conserve l'alignement pixel de la source 50 cm :
-            # origine = coin dalle - 0.25 m (demi-pixel)
+            # nom = coin NW : ouest X*1000, nord Y*1000 ; gdalwarp conserve
+            # l'alignement pixel de la source 50 cm (origine - 0.25 m)
             check(abs(gt[0] - (X * 1000 - 0.25)) <= 1.0
-                  and abs(gt[3] - ((Y + 1) * 1000 + 0.25)) <= 1.0,
+                  and abs(gt[3] - (Y * 1000 + 0.25)) <= 1.0,
                   f"{nom}: origine ({gt[0]},{gt[3]}) hors dalle {dalle}")
 
             tags = j["metadata"].get("", {})

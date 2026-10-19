@@ -1,9 +1,10 @@
 # PoC01 - Makefile d'orchestration
 # Zone: quartier de l'Europe, Tours (47.422648, 0.683287) - L93: 525363.55 6705039.73
-# Dalle centrale: 0525_6705 ; rayon 1 km = 7 dalles
+# Nom de dalle = coin NW (ouest X km, nord Y km). Dalle du point: 0525_6706
+# rayon 1 km = 7 dalles
 
 PRODUITS := MNS MNT
-DALLES := 0524_6704 0524_6705 0525_6704 0525_6705 0525_6706 0526_6704 0526_6705
+DALLES := 0524_6705 0524_6706 0525_6705 0525_6706 0525_6707 0526_6705 0526_6706
 
 .PHONY: doctor download ingest vrt check clean help
 
