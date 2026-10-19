@@ -10,6 +10,7 @@ gdal_polygonize, nettoie (micro-polygones) et sort un GeoJSON WGS84.
 """
 import argparse
 import json
+from datetime import datetime
 import subprocess
 import sys
 import tempfile
@@ -178,19 +179,25 @@ def main():
              "/vsistdout/", str(gpkg)],
             check=True, capture_output=True, text=True).stdout
 
-    # stats zonales MNH par polygone (identifiant = valeur DN du GPKG)
+    # stats zonales par polygone (identifiant = valeur DN du GPKG) :
+    # mnh min/max/moy et mns max, pour qualifier chaque obstacle
     stats = {}
     if ids is not None and ids.shape == mnh.shape:
         import numpy as np
         ordre = np.argsort(ids, axis=None)
         ids_tri = ids.flatten()[ordre]
         mnh_tri = mnh.flatten()[ordre]
+        mns_tri = mns.flatten()[ordre]
         bornes = np.flatnonzero(np.diff(ids_tri)) + 1
         for debut, fin in zip(np.r_[0, bornes], np.r_[bornes, ids_tri.size]):
             gid = int(ids_tri[debut])
             vals = mnh_tri[debut:fin]
-            stats[gid] = (round(float(vals.max()), 1),
-                          round(float(vals.mean()), 1))
+            stats[gid] = {
+                "mnh_min_m": round(float(vals.min()), 1),
+                "mnh_max_m": round(float(vals.max()), 1),
+                "mnh_moy_m": round(float(vals.mean()), 1),
+                "mns_max_m": round(float(mns_tri[debut:fin].max()), 1),
+            }
 
     fc = json.loads(gj)
     total = len(fc.get("features", []))
@@ -201,14 +208,20 @@ def main():
         aire = aire_polygone(f["geometry"]["coordinates"][0])
         if aire >= args.aire_mini:
             props = {"aire_m2": round(aire, 1)}
-            gid = f["properties"].get("DN")
-            mx, moy = stats.get(gid, (None, None))
-            if mx is not None:
-                props["mnh_max_m"] = mx
-                props["mnh_moy_m"] = moy
+            props.update(stats.get(f["properties"].get("DN"), {}))
             f["properties"] = props
             gardes.append(f)
     fc["features"] = gardes
+
+    # parametres du run au niveau de la FeatureCollection
+    fc["properties"] = {
+        "seuil_m": args.seuil,
+        "rayon_m": args.rayon,
+        "aire_mini_m2": args.aire_mini,
+        "date_generation": datetime.now().isoformat(timespec="seconds"),
+        "centre_lat": 47.422648, "centre_lon": 0.683287,
+    }
+    fc.pop("name", None)
     print(f"  polygones obstacles vectorisés: {total}, "
           f"gardés (aire >= {args.aire_mini:.0f} m²): {len(gardes)}")
 
