@@ -16,6 +16,12 @@ dst="${dst_dir}/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 [ -f "${src}" ] || { echo "Dalle source absente: ${src}"; exit 1; }
 mkdir -p "${dst_dir}"
 
+# sauter si la tuile existe deja avec ses balises (idempotence)
+if [ -f "${dst}" ]; then
+  echo "Tuile déjà présente, saut: ${dst}"
+  exit 0
+fi
+
 gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE -q \
   "${src}" "${dst}"
 

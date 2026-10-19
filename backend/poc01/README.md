@@ -124,7 +124,11 @@ Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6705_MNS_O_0M50_LAMB93_IGN69.
   transformée ;
 - `gdalinfo -stats` (donc `make check`) dépose des `.tif.aux.xml` à côté des
   tuiles : cache GDAL des statistiques, régénérable, ignoré par git,
-  supprimé par `make clean`.
+  supprimé par `make clean` ;
+- `download.sh` et `ingest.sh` sont **idempotents** : une dalle déjà
+  téléchargée (ou déjà ingérée en tuile) est sautée — relancer `make
+  download` / `make ingest` ne re-télécharge rien et ne surcharge pas le
+  service IGN ; `make clean` ne supprime que sur demande explicite.
 
 ## Vérifications faites sur la dalle du point (0525_6706, BBOX
 524999.75–525999.75 / 6705000.25–6706000.25)

@@ -26,6 +26,18 @@ URL+="&FILENAME=LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 dst="${ROOT}/data/downloads/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 mkdir -p "${ROOT}/data/downloads"
 
+# sauter si la tuile est deja ingeree (evite de surcharger l'IGN)
+tuile="${ROOT}/data/${produit,,}/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
+if [ -f "${tuile}" ]; then
+  echo "Déjà ingérée, saut: ${tuile}"
+  exit 0
+fi
+
+if [ -f "${dst}" ]; then
+  echo "Déjà téléchargée, saut: ${dst}"
+  exit 0
+fi
+
 echo "Téléchargement ${produit} ${dalle} -> ${dst}"
 curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
   --output "${dst}" "${URL}"
