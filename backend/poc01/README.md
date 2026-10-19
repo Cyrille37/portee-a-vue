@@ -2,6 +2,35 @@
 
 Document de référence: [masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md](../../masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md)
 
+## Prérequis
+
+Tous les outils sont gratuits et standard ; rien d'autre n'est indispensable
+pour ce PoC (pas de Node/MapLibre — frontend existant hors périmètre, ni de
+WhiteboxTools — points hauts = plus tard, ni de PostgreSQL/QGIS — même si QGIS
+est pratique pour inspecter visuellement les tuiles).
+
+| Outil | Rôle dans le PoC | Version mini |
+|---|---|---|
+| **GDAL** (`gdalwarp`, `gdalbuildvrt`, `gdallocationinfo`, `gdal_polygonize`) | Ingestion 2 m, VRT, échantillonnage, vectorisation | ≥ 3.9 recommandé |
+| **Python 3** | Scripts de calcul (carroyage, profil, Fresnel, tests) | ≥ 3.10 |
+| **numpy** (paquet Python) | Calcul vectorisé des seuils/profils | récent suffit |
+| **sqlite3** | Base métadonnées | ≤ système |
+| **curl** + **unzip** | Téléchargement dalles via l'API Atom | système |
+
+Installation selon l'OS :
+
+- **Debian/Ubuntu** : `sudo apt install gdal-bin python3 python3-numpy sqlite3 curl unzip`
+- **macOS (Homebrew)** : `brew install gdal python numpy sqlite3 curl`
+- **Windows** : installateur OSGeo4W (GDAL officiel, inclut Python) — ou WSL2 + commandes Debian ci-dessus
+
+Vérification :
+
+```bash
+gdalinfo --version                    # GDAL 3.x
+python3 -c "import numpy; print(numpy.__version__)"
+sqlite3 --version
+```
+
 À partir des sources :
 
 | **MNS LiDAR HD (50 cm)** — surface : bâti + végétation | **Source principale du socle** : masque d'altitude, obstacles des profils | À la carte `cartes.gouv.fr/telechargement/IGNF_MNS-LIDAR-HD` ou API Atom `https://data.geopf.fr/telechargement` (10 req/s) | Dalles 1 km², ~24 Mo ; 126–190 Go pour un disque de 50 km |
