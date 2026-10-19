@@ -4,11 +4,12 @@
 SEUIL ?= 10
 RAYON ?= 1000
 OUT ?= masque.geojson
+AIRE_MINI ?= 0
 
 .PHONY: masque help
 
 help:
-	@echo "Cibles: masque [SEUIL=10] [RAYON=1000] [OUT=masque.geojson]"
+	@echo "Cibles: masque [SEUIL=10] [RAYON=1000] [AIRE_MINI=0] [OUT=masque.geojson]"
 
 masque:
-	@python3 scripts/masque.py --seuil $(SEUIL) --rayon $(RAYON) --out $(OUT)
+	@python3 scripts/masque.py --seuil $(SEUIL) --rayon $(RAYON) --aire-mini $(AIRE_MINI) --out $(OUT)

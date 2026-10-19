@@ -18,7 +18,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent  # backend/
 DATA = ROOT / "data"
 EUROPE_L93 = (525363.55, 6705039.73)
-AIRE_MINI_M2 = 100.0
 SIMPLIFIE_M = 5.0
 PAS = 2.0  # résolution des tuiles PoC01
 
@@ -113,6 +112,9 @@ def main():
     ap.add_argument("--rayon", type=float, default=1000.0,
                     help="rayon du disque analysé (m) autour du point Europe (défaut: 1000)")
     ap.add_argument("--out", default="masque.geojson", help="fichier GeoJSON de sortie")
+    ap.add_argument("--aire-mini", type=float, default=0.0,
+                    help="aire minimale d'un polygone en m² (défaut: 0 = tout "
+                         "conserver — tout ce qui dépasse le seuil est gardé)")
     args = ap.parse_args()
 
     vrt_mns, vrt_mnt = DATA / "mns.vrt", DATA / "mnt.vrt"
@@ -197,7 +199,7 @@ def main():
         if f["geometry"]["type"] != "Polygon":
             continue
         aire = aire_polygone(f["geometry"]["coordinates"][0])
-        if aire >= AIRE_MINI_M2:
+        if aire >= args.aire_mini:
             props = {"aire_m2": round(aire, 1)}
             gid = f["properties"].get("DN")
             mx, moy = stats.get(gid, (None, None))
@@ -207,7 +209,8 @@ def main():
             f["properties"] = props
             gardes.append(f)
     fc["features"] = gardes
-    print(f"  polygones vectorisés: {total}, gardés (aire >= {AIRE_MINI_M2:.0f} m²): {len(gardes)}")
+    print(f"  polygones obstacles vectorisés: {total}, "
+          f"gardés (aire >= {args.aire_mini:.0f} m²): {len(gardes)}")
 
     Path(args.out).write_text(json.dumps(fc, ensure_ascii=False), encoding="utf-8")
     print(f"  -> {args.out}")

@@ -16,7 +16,9 @@ paramétré — bâti, forêt, ouvrages d'art.
 3. **Masque binaire** : cellule = obstacle si `MNH > seuil` (paramètre,
    ex. 10 m). Le relief seul (MNH ≈ 0) n'est jamais obstacle.
 4. **Vectorisation** : `gdal_polygonize` → MultiPolygon avec trous.
-5. **Nettoyage** : suppression des micro-polygones (aire < 100 m²),
+5. **Nettoyage** : optionnel, filtrage des polygones d'aire <
+   `--aire-mini` (défaut **0 : tout conserver** — tout ce qui dépasse le
+   seuil est gardé, y compris un arbre isolé de quelques cellules 2 m) ;
    simplification Douglas-Peucker (5 m).
 6. **Sortie** : GeoJSON WGS84 (`EPSG:4326`), prêt pour une couche
    `fill` MapLibre ; chaque polygone porte son aire (`aire_m2`) et les
@@ -47,6 +49,7 @@ Paramètres :
 |---|---|---|
 | `--seuil` | 10 | hauteur hors-sol (m) au-delà de laquelle une cellule est un obstacle |
 | `--rayon` | 1000 | rayon du disque analysé (m) autour du point Europe |
+| `--aire-mini` | 0 | aire minimale d'un polygone (m²) — 0 = tout conserver |
 | `--out` | masque.geojson | fichier de sortie |
 
 ## Prérequis
