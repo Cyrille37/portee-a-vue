@@ -66,10 +66,20 @@ def ecrire_masque_gtiff(chemin, masque, x0, y1):
 
 
 def aire_polygone(ring):
-    """Aire d'un anneau L93 (lacet), en m²."""
+    """Aire d'un anneau en WGS84, convertie en m² (échelle locale).
+
+    Le GeoJSON a été reprojeté en EPSG:4326 : le lacet donne des degrés²,
+    qu'on convertit avec le facteur local degrés->mètres autour du centroïde
+    (1° lat ≈ 111 320 m ; 1° lon ≈ 111 320·cos(lat)). Précision suffisante
+    pour un filtre d'ordre de grandeur sur ~1 km.
+    """
+    import math
     import numpy as np
     pts = np.asarray(ring)
-    x, y = pts[:, 0], pts[:, 1]
+    lat0 = float(pts[:, 1].mean())
+    kx = 111320.0 * math.cos(math.radians(lat0))
+    ky = 111320.0
+    x, y = pts[:, 0] * kx, pts[:, 1] * ky
     return 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
 
 
@@ -122,6 +132,7 @@ def main():
             check=True, capture_output=True, text=True).stdout
 
     fc = json.loads(gj)
+    total = len(fc.get("features", []))
     gardes = []
     for f in fc.get("features", []):
         if f["geometry"]["type"] != "Polygon":
@@ -131,7 +142,7 @@ def main():
             f["properties"]["aire_m2"] = round(aire, 1)
             gardes.append(f)
     fc["features"] = gardes
-    print(f"  polygones gardés (aire >= {AIRE_MINI_M2:.0f} m²): {len(gardes)}")
+    print(f"  polygones vectorisés: {total}, gardés (aire >= {AIRE_MINI_M2:.0f} m²): {len(gardes)}")
 
     Path(args.out).write_text(json.dumps(fc, ensure_ascii=False), encoding="utf-8")
     print(f"  -> {args.out}")
