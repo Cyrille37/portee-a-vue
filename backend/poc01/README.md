@@ -85,7 +85,36 @@ Depuis `backend/poc01` :
 - scripts unitaires : `scripts/download.sh <MNS|MNT> <XXXX_YYYY>`,
   `scripts/ingest.sh <MNS|MNT> <XXXX_YYYY>`.
 
-Vérifications faites sur la dalle centrale (0525_6705) :
+## Balises de traçabilité
+
+Posées après le `gdalwarp` par `gdal_edit -mo`
+(sur Ubuntu 22.04 le binaire s'appelle `gdal_edit.py` — le script gère
+le fallback) :
+
+```text
+SOURCE_PRODUIT=MNS_LIDAR_HD
+SOURCE_DALLE=LHD_FXX_0525_6705
+SOURCE_PAS=0.5m
+INGEST_DATE=2026-10-19
+INGEST_OUTIL=gdalwarp 3.4.1
+```
+
+Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6705_MNS_O_0M50_LAMB93_IGN69.tif | grep -E "SOURCE|INGEST"`
+
+## Notes d'exécution (retours réels)
+
+- volumétrie constatée : dalle 50 cm ≈ 16 Mo ; tuile 2 m Int16 ≈ 0,3 Mo ;
+  14 dalles (7 MNS + 7 MNT) ingérées sans erreur ;
+- le WMS-R peut renvoyer une `400` transitoire (limite de débit) : le
+  `curl --retry-all-errors --retry 3` la rejoue ; si une dalle manque,
+  relancer `make download` (idempotent) ;
+- attention : `gdalwarp` ne connaît pas `-mo` (erreur `ERROR 6: Unknown
+  option name '-mo'`) — d'où le `gdal_edit` séparé ;
+- les boucles `download`/`ingest` du Makefile sont *fail-fast* : une dalle
+  manquante arrête l'ingestion plutôt que de supprimer une source non
+  transformée.
+
+## Vérifications faites sur la dalle centrale (0525_6705)
 GeoTIFF 2000×2000 float32, emprise exacte 525999.75–526999.75 /
 6705000.25–6706000.25, z sol ≈ 101 m NGF au point Europe (MNS = MNT :
 point en rue, pas de sursol), max MNS 149 m (bâti), max MNT 106 m.
