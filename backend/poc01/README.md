@@ -11,10 +11,10 @@ est pratique pour inspecter visuellement les tuiles).
 
 | Outil | Rôle dans le PoC | Version mini |
 |---|---|---|
-| **GDAL** (`gdalwarp`, `gdalbuildvrt`, `gdallocationinfo`, `gdal_polygonize`) | Ingestion 2 m, VRT, échantillonnage, vectorisation | ≥ 3.9 recommandé |
-| **Python 3** | Scripts de calcul (carroyage, profil, Fresnel, tests) | ≥ 3.10 |
-| **numpy** (paquet Python) | Calcul vectorisé des seuils/profils | récent suffit |
-| **sqlite3** | Base métadonnées | ≤ système |
+| **GDAL** (`gdalwarp`, `gdalbuildvrt`, `gdallocationinfo`, `gdal_polygonize`) | Ingestion 2 m, VRT, échantillonnage, vectorisation | ≥ 3.4 (testé 3.4.1) |
+| **Python 3** | Scripts de calcul (carroyage, profil, Fresnel, tests) | ≥ 3.10 (testé 3.10) |
+| **numpy** (paquet Python) | Calcul vectorisé des seuils/profils | ≥ 1.21 (testé 1.21.5) |
+| **sqlite3** | Base métadonnées | 3.x (testé 3.37.2) |
 | **curl** + **unzip** | Téléchargement dalles via l'API Atom | système |
 
 Installation selon l'OS :
