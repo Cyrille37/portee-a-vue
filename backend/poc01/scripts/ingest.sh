@@ -16,11 +16,14 @@ dst="${dst_dir}/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 [ -f "${src}" ] || { echo "Dalle source absente: ${src}"; exit 1; }
 mkdir -p "${dst_dir}"
 
-# sauter si la tuile existe deja avec ses balises (idempotence)
+# sauter si la tuile existe deja (idempotence) ; sinon l'ingérer
+# en une étape atomique: si gdalwarp ou gdal_edit echoue, la tuile
+# partielle est supprimee pour ne pas empoisonner les relances
 if [ -f "${dst}" ]; then
   echo "Tuile déjà présente, saut: ${dst}"
   exit 0
 fi
+trap 'rm -f "${dst}"' ERR
 
 gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE -q \
   "${src}" "${dst}"

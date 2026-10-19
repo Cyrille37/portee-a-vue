@@ -42,4 +42,13 @@ echo "Téléchargement ${produit} ${dalle} -> ${dst}"
 curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
   --output "${dst}" "${URL}"
 
+# integrite minimale: une dalle valide fait ~15-25 Mo ; un corps d'erreur
+# WMS-R n'en fait que quelques Ko et ne doit jamais etre accepte
+TAILLE_MIN=10000000  # 10 Mo
+if [ "$(stat -c%s "${dst}")" -lt "${TAILLE_MIN}" ]; then
+  echo "Dalle suspecte (${dst} trop petite), suppression" >&2
+  rm -f "${dst}"
+  exit 1
+fi
+
 ls -lh "${dst}"

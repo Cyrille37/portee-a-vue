@@ -82,7 +82,10 @@ def main():
         if None not in (mm, mj):
             check(mm >= mj, f"{dalle}: max MNS {mm} < max MNT {mj}")
         if None not in (sm, sj):
-            check(sm <= sj + 2.0, f"{dalle}: min MNS {sm} > min MNT {sj} + 2 m")
+            # invariant physique : min MNS >= min MNT (tolérance 1 m,
+            # nodata/arrondi) — le point le plus bas de la surface ne peut
+            # pas être sous le point le plus bas du sol
+            check(sm >= sj - 1.0, f"{dalle}: min MNS {sm} < min MNT {sj} - 1 m")
 
     # continuite : couverture du disque r=1km sans trou ni chevauchement.
     # une tuile manquante dans l'emprise theorique = trou ;
