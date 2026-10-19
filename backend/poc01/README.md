@@ -87,10 +87,14 @@ Depuis `backend/poc01` :
   (`gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE`) avec balises de
   traçabilité, supprime la source 50 cm ;
 - `make vrt` — assemble `backend/data/mns.vrt` et `mnt.vrt` ;
-- `make check` — contrôle qualité des 14 tuiles : 500×500 px, pas 2 m,
-  Int16, origine alignée sur la dalle 1 km², balises `SOURCE_*`/`INGEST_*`,
-  cohérence MNS ≥ MNT, et altitude au point Europe via `gdallocationinfo`
-  sur les VRT (s'ils sont construits) ;
+- `make check` — contrôle qualité hors-ligne des 14 tuiles : 500×500 px,
+  pas 2 m, Int16, origine alignée sur la dalle 1 km², balises
+  `SOURCE_*`/`INGEST_*`, cohérence MNS ≥ MNT, couverture du disque 1 km
+  sans trou (géométrie recalculée depuis le point Europe), et altitude au
+  point Europe via `gdallocationinfo` sur les VRT (s'ils sont construits) ;
+- `make check-remote` — croisement en ligne avec l'API altimétrie IGN
+  (vérité terrain) : 10 points aléatoires reproductibles dans la zone,
+  comparaison VRT 2 m max-poolé vs LiDAR HD 50 cm, tolérance 5 m ;
 - scripts unitaires : `scripts/download.sh <MNS|MNT> <XXXX_YYYY>`,
   `scripts/ingest.sh <MNS|MNT> <XXXX_YYYY>`.
 

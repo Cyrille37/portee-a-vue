@@ -84,6 +84,29 @@ def main():
         if None not in (sm, sj):
             check(sm <= sj + 2.0, f"{dalle}: min MNS {sm} > min MNT {sj} + 2 m")
 
+    # continuite : couverture du disque r=1km sans trou ni chevauchement.
+    # une tuile manquante dans l'emprise theorique = trou ;
+    # une tuile non prevue = chevauchement potentiel.
+    for produit in ("MNS", "MNT"):
+        presentes = {d for d in DALLES if tile_path(produit, d).exists()}
+        # toutes les cases du rectangle englobant qui touchent le disque
+        cx, cy = EUROPE_L93
+        attendues = set()
+        # nom NW : la dalle (X, Y) couvre est [X*1000,(X+1)*1000],
+        # nord [(Y-1)*1000, Y*1000]
+        for X in range(int(cx // 1000) - 1, int(cx // 1000) + 2):
+            for Y in range(int(cy // 1000) - 1, int(cy // 1000) + 3):
+                px = min(max(cx, X * 1000), (X + 1) * 1000)
+                py = min(max(cy, (Y - 1) * 1000), Y * 1000)
+                if (px - cx) ** 2 + (py - cy) ** 2 <= 1000 ** 2:
+                    attendues.add("%04d_%04d" % (X, Y))
+        check(attendues == set(DALLES),
+              f"{produit}: liste DALLES {DALLES} != couverture théorique {sorted(attendues)}")
+        manquantes = attendues - presentes
+        check(not manquantes, f"{produit}: trous dans la couverture {sorted(manquantes)}")
+
+    # altitude au point Europe via le VRT (si construit)
+
     # altitude au point Europe via le VRT (si construit)
     for produit in ("mns", "mnt"):
         vrt = DATA / f"{produit}.vrt"
