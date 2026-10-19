@@ -21,11 +21,11 @@ est pratique pour inspecter visuellement les tuiles).
 
 | Outil | Rôle dans le PoC | Version mini |
 |---|---|---|
-| **GDAL** (`gdalwarp`, `gdalbuildvrt`, `gdallocationinfo`, `gdal_polygonize`) | Ingestion 2 m, VRT, échantillonnage, vectorisation | ≥ 3.4 (testé 3.4.1) |
+| **GDAL** (`gdalwarp`, `gdalbuildvrt`, `gdallocationinfo`, `gdaltransform`, `gdal_edit`/`gdal_edit.py`) | Ingestion 2 m, VRT, échantillonnage, reprojection, balises | ≥ 3.4 (testé 3.4.1) |
 | **Python 3** | Scripts de calcul (carroyage, profil, Fresnel, tests) | ≥ 3.10 (testé 3.10) |
 | **numpy** (paquet Python) | Calcul vectorisé des seuils/profils | ≥ 1.21 (testé 1.21.5) |
-| **sqlite3** | Base métadonnées | 3.x (testé 3.37.2) |
-| **curl** + **unzip** | Téléchargement dalles via l'API Atom | système |
+| **sqlite3** | Base métadonnées (étape suivante) | 3.x (testé 3.37.2) |
+| **curl** | Téléchargement des dalles (WMS-R) | système |
 
 Installation selon l'OS :
 
@@ -43,15 +43,17 @@ sqlite3 --version
 
 À partir des sources :
 
-| **MNS LiDAR HD (50 cm)** — surface : bâti + végétation | **Source principale du socle** : masque d'altitude, obstacles des profils | À la carte `cartes.gouv.fr/telechargement/IGNF_MNS-LIDAR-HD` ou API Atom `https://data.geopf.fr/telechargement` (10 req/s) | Dalles 1 km², ~24 Mo ; 126–190 Go pour un disque de 50 km |
-| **MNT LiDAR HD (50 cm)** — sol nu | Altitude du sol aux sites A/B (base du mât), séparation relief/sursol | Même canal (`IGNF_MNT-LIDAR-HD`) | ~24 Mo/dalle 50 cm (version 5 m : ~0,5 Mo) |
+| Produit | Rôle dans le PoC | Accès | Volumétrie constatée |
+|---|---|---|---|
+| **MNS LiDAR HD (50 cm)** — surface : bâti + végétation | Source principale du socle : obstacles des profils, sursol | WMS-R (voir section suivante) | dalle 1 km² ≈ 16 Mo |
+| **MNT LiDAR HD (50 cm)** — sol nu | Altitude du sol aux sites A/B (base du mât), séparation relief/sursol | WMS-R (même canal, couche MNT) | dalle 1 km² ≈ 16 Mo |
 
 ## De la dalle IGN à votre tuile
 
 Les tuiles 2 m sont des **produits dérivés** ; les MNS/MNT 50 cm sont leurs **sources** :
 
-1. téléchargement d'une dalle IGN (GeoTIFF 1 km², ~24 Mo, 2 000×2 000 px) ;
-2. transformation `gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE` → tuile dérivée 500×500 px, 0,5 Mo, même emprise ;
+1. téléchargement d'une dalle IGN (GeoTIFF 1 km², ~16 Mo, 2 000×2 000 px, float32) ;
+2. transformation `gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE` → tuile dérivée 500×500 px, ~491 Ko, même emprise ;
 3. suppression de la source 50 cm ;
 4. la tuile garde le nom et l'emprise de la dalle IGN — le carroyage national devient l'index.
 
@@ -69,8 +71,9 @@ dataset `LiDARHD-NUALID`). L'accès programme aux dalles MNS/MNT passe par :
   `code_mission`, dates d'acquisition, capteur… ;
 - le **service WMS-R** (`https://data.geopf.fr/wms-r`) qui sert chaque dalle
   en GeoTIFF (2000×2000 px, pas 50 cm, float32, nodata −9999) via un GetMap
-  dérivé par arithmétique du carroyage :
-  `BBOX = {X}999.75,{Y}000.25,{X+1}999.75,{Y+1}000.25`.
+  dérivé par arithmétique du carroyage (coin NW) :
+  `BBOX = {X}999.75,{Y-1}000.25,{X+1}999.75,{Y}000.25`
+  (ex. `0525_6706` → `524999.75,6705000.25,525999.75,6706000.25`).
 
 Les tuiles sont donc téléchargées par WMS-R direct (moins d'indirection),
 le WFS métadonnées restant la source des attributs de traçabilité (mission,
@@ -106,17 +109,17 @@ le fallback) :
 
 ```text
 SOURCE_PRODUIT=MNS_LIDAR_HD
-SOURCE_DALLE=LHD_FXX_0525_6705
+SOURCE_DALLE=LHD_FXX_0525_6706
 SOURCE_PAS=0.5m
 INGEST_DATE=2026-10-19
-INGEST_OUTIL=gdalwarp 3.4.1
+INGEST_OUTIL=gdalwarp 3.4.1 / r=max, tr=2m, Int16
 ```
 
-Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6705_MNS_O_0M50_LAMB93_IGN69.tif | grep -E "SOURCE|INGEST"`
+Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6706_MNS_O_0M50_LAMB93_IGN69.tif | grep -E "SOURCE|INGEST"`
 
 ## Notes d'exécution (retours réels)
 
-- volumétrie constatée : dalle 50 cm ≈ 16 Mo ; tuile 2 m Int16 ≈ 0,3 Mo ;
+- volumétrie constatée : dalle 50 cm ≈ 16 Mo ; tuile 2 m Int16 ≈ 491 Ko ;
   14 dalles (7 MNS + 7 MNT) ingérées sans erreur ;
 - le WMS-R peut renvoyer une `400` transitoire (limite de débit) : le
   `curl --retry-all-errors --retry 3` la rejoue ; si une dalle manque,
@@ -145,4 +148,16 @@ max MNT 103 m — croisé avec l'API altimétrie IGN : 99,33 m.
 scripts décalait le BBOX de +1 km en X et Y ; les dalles étaient
 téléchargées 1 km trop à l'est et au nord. Corrigé et validé par croisement
 tuile / API altimétrie (99,35 vs 99,33 m).
+
+## Résultat du croisement `make check-remote` (réel, 2026-10-19)
+
+10 points aléatoires dans la zone, VRT 2 m max-poolé vs API altimétrie
+IGN (LiDAR HD 50 cm) : **écart max 0,65 m, moyen 0,33 m** — attendu,
+le max-pooling 2 m et l'arrondi Int16 expliquant l'ordre de grandeur.
+Le socle (téléchargement → ingestion → VRT → lecture) est donc validé
+de bout en bout sur la zone du PoC.
+
+`make doctor` vérifie tous les binaires requis : `gdalinfo`, `gdalwarp`,
+`gdalbuildvrt`, `gdallocationinfo`, `gdaltransform`, `gdal_edit`/`gdal_edit.py`,
+`curl`, `python3`+`numpy`.
 
