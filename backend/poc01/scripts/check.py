@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent.parent  # backend/
 DATA = ROOT / "data"
 DALLES = ["0524_6704", "0524_6705", "0525_6704", "0525_6705", "0525_6706", "0526_6704", "0526_6705"]
 EUROPE_L93 = (525363.55, 6705039.73)
