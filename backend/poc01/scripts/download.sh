@@ -20,7 +20,7 @@ dst="${ROOT}/data/downloads/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif
 mkdir -p "${ROOT}/data/downloads"
 
 echo "Téléchargement ${produit} ${dalle} -> ${dst}"
-curl --fail --silent --show-error --location --retry 3 \
+curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
   --output "${dst}" "${URL}"
 
 ls -lh "${dst}"

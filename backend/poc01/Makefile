@@ -22,7 +22,7 @@ download:
 	@for p in $(PRODUITS); do \
 	  for d in $(DALLES); do \
 	    echo "== $$p $$d"; \
-	    ./scripts/download.sh $$p $$d; \
+	    ./scripts/download.sh $$p $$d || exit 1; \
 	  done; \
 	done
 
@@ -30,7 +30,7 @@ ingest:
 	@for p in $(PRODUITS); do \
 	  for d in $(DALLES); do \
 	    echo "== $$p $$d"; \
-	    ./scripts/ingest.sh $$p $$d; \
+	    ./scripts/ingest.sh $$p $$d || exit 1; \
 	  done; \
 	done
 

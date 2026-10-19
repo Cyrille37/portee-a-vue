@@ -19,7 +19,10 @@ mkdir -p "${dst_dir}"
 gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE -q \
   "${src}" "${dst}"
 
-gdal_edit -mo "SOURCE_PRODUIT=${produit}_LIDAR_HD" \
+GDAL_EDIT="gdal_edit"
+command -v gdal_edit >/dev/null || GDAL_EDIT="gdal_edit.py"
+
+"${GDAL_EDIT}" -mo "SOURCE_PRODUIT=${produit}_LIDAR_HD" \
   -mo "SOURCE_DALLE=LHD_FXX_${X}_${Y}" \
   -mo "SOURCE_PAS=0.5m" \
   -mo "INGEST_DATE=$(date +%F)" \
