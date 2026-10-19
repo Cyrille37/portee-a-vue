@@ -5,10 +5,10 @@
 PRODUITS := MNS MNT
 DALLES := 0524_6704 0524_6705 0525_6704 0525_6705 0525_6706 0526_6704 0526_6705
 
-.PHONY: doctor download ingest vrt clean help
+.PHONY: doctor download ingest vrt check clean help
 
 help:
-	@echo "Cibles: doctor | download | ingest | vrt | clean"
+	@echo "Cibles: doctor | download | ingest | vrt | check | clean"
 
 doctor:
 	@command -v gdalinfo >/dev/null || { echo "GDAL manquant (apt install gdal-bin)"; exit 1; }
@@ -38,6 +38,9 @@ vrt:
 	@gdalbuildvrt ../data/mns.vrt ../data/mns/*.tif
 	@gdalbuildvrt ../data/mnt.vrt ../data/mnt/*.tif
 	@gdalinfo ../data/mns.vrt | head -20
+
+check:
+	@python3 scripts/check.py
 
 clean:
 	rm -f ../data/mns.vrt ../data/mnt.vrt
