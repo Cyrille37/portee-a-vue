@@ -19,17 +19,23 @@ paramétré — bâti, forêt, ouvrages d'art.
 5. **Nettoyage** : suppression des micro-polygones (aire < 100 m²),
    simplification Douglas-Peucker (5 m).
 6. **Sortie** : GeoJSON WGS84 (`EPSG:4326`), prêt pour une couche
-   `fill` MapLibre ; chaque polygone porte son aire et la hauteur
-   MNH max/moyenne qu'il contient.
+   `fill` MapLibre ; chaque polygone porte son aire (`aire_m2`) et les
+   attributs `mnh_max_m` / `mnh_moy_m` (hauteur hors-sol max/moyenne
+   des cellules qu'il couvre) — utiles pour qualifier bâti vs forêt.
 
 ## Outils
 
 Depuis `backend/poc02` :
 
-- `make masque SEUIL=10` — produit `masque.geojson` (seuil MNH en
-  mètres, défaut 10) ;
-- le script appelle `scripts/masque.py` qui peut aussi se lancer
-  directement :
+```bash
+make masque                     # seuil 10 m par défaut
+make masque SEUIL=20           # obstacles de plus de 20 m
+make masque SEUIL=5 RAYON=500  # seuil 5 m, rayon 500 m
+make masque SEUIL=15 OUT=test15.geojson   # fichier de sortie nommé
+
+# ou directement :
+python3 scripts/masque.py --seuil 15 --rayon 1000 --out masque.geojson
+```
 
 ```bash
 python3 scripts/masque.py --seuil 10 --rayon 1000 --out masque.geojson

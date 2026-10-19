@@ -65,6 +65,29 @@ def ecrire_masque_gtiff(chemin, masque, x0, y1):
         check=True, capture_output=True)
 
 
+def _lire_pgm_ou_gtiff(chemin, forme_attendue):
+    """Lit le raster d'identifiants en array int, ou None si illisible."""
+    import numpy as np
+    r = subprocess.run(["gdal_translate", "-of", "AAIGrid", "-co", "DECIMAL_PRECISION=0",
+                        str(chemin), "/vsistdout/"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
+    lignes = []
+    for l in r.stdout.splitlines():
+        l = l.strip()
+        if not l or not (l[0].isdigit() or l[0] in "-+."):
+            continue
+        try:
+            lignes.append([int(float(v)) for v in l.split()])
+        except ValueError:
+            return None
+    if not lignes:
+        return None
+    a = np.array(lignes, dtype=np.int64)
+    return a if a.shape == forme_attendue else None
+
+
 def aire_polygone(ring):
     """Aire d'un anneau en WGS84, convertie en m² (échelle locale).
 
@@ -126,10 +149,31 @@ def main():
                         str(gpkg), "obstacles", "DN"],
                        check=True, capture_output=True)
 
+        # raster d'identifiants: chaque polygone polygonise remplace ses
+        # cellules par son index (attribut DN) -> stats zonales directes
+        tif_id = td / "ids.tif"
+        subprocess.run(["gdal_rasterize", "-a", "DN", "-l", "obstacles",
+                        str(gpkg), str(tif_id)],
+                       check=True, capture_output=True)
         gj = subprocess.run(
             ["ogr2ogr", "-f", "GeoJSON", "-t_srs", "EPSG:4326",
              "-simplify", str(SIMPLIFIE_M), "/vsistdout/", str(gpkg)],
             check=True, capture_output=True, text=True).stdout
+        ids = _lire_pgm_ou_gtiff(tif_id, masque.shape)
+
+    # stats zonales MNH par polygone (identifiant = valeur DN du GPKG)
+    stats = {}
+    if ids is not None and ids.shape == mnh.shape:
+        import numpy as np
+        ordre = np.argsort(ids, axis=None)
+        ids_tri = ids.flatten()[ordre]
+        mnh_tri = mnh.flatten()[ordre]
+        bornes = np.flatnonzero(np.diff(ids_tri)) + 1
+        for debut, fin in zip(np.r_[0, bornes], np.r_[bornes, ids_tri.size]):
+            gid = int(ids_tri[debut])
+            vals = mnh_tri[debut:fin]
+            stats[gid] = (round(float(vals.max()), 1),
+                          round(float(vals.mean()), 1))
 
     fc = json.loads(gj)
     total = len(fc.get("features", []))
@@ -140,6 +184,11 @@ def main():
         aire = aire_polygone(f["geometry"]["coordinates"][0])
         if aire >= AIRE_MINI_M2:
             f["properties"]["aire_m2"] = round(aire, 1)
+            gid = f["properties"].get("DN")
+            mx, moy = stats.get(gid, (None, None))
+            if mx is not None:
+                f["properties"]["mnh_max_m"] = mx
+                f["properties"]["mnh_moy_m"] = moy
             gardes.append(f)
     fc["features"] = gardes
     print(f"  polygones vectorisés: {total}, gardés (aire >= {AIRE_MINI_M2:.0f} m²): {len(gardes)}")
