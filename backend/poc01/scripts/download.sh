@@ -9,10 +9,17 @@ dalle="${2:?usage: download.sh <MNS|MNT> <XXXX_YYYY>}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 X="${dalle%%_*}"; Y="${dalle##*_}"   # nom = coin NW (ouest X km, nord Y km)
 
+# BBOX numerique : jamais de concatenation de chaine sur les noms paddes
+# (0524 -> 0524999.75 serait lu 524999.75, i.e. +1 km).
+west=$(awk -v x=$((10#${X}))     'BEGIN{printf "%.2f", x*1000-0.25}')
+east=$(awk -v x=$((10#${X}+1))   'BEGIN{printf "%.2f", x*1000-0.25}')
+south=$(awk -v y=$((10#${Y}-1))  'BEGIN{printf "%.2f", y*1000+0.25}')
+north=$(awk -v y=$((10#${Y}))    'BEGIN{printf "%.2f", y*1000+0.25}')
+
 URL="https://data.geopf.fr/wms-r?SERVICE=WMS&VERSION=1.3.0&EXCEPTIONS=text/xml&REQUEST=GetMap"
 URL+="&LAYERS=IGNF_LIDAR-HD_${produit}_ELEVATION.ELEVATIONGRIDCOVERAGE.LAMB93"
 URL+="&FORMAT=image/geotiff&STYLES=&CRS=EPSG:2154"
-URL+="&BBOX=${X}999.75,$((10#${Y}-1))000.25,$((10#${X}+1))999.75,${Y}000.25"
+URL+="&BBOX=${west},${south},${east},${north}"
 URL+="&WIDTH=2000&HEIGHT=2000"
 URL+="&FILENAME=LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 
