@@ -36,8 +36,20 @@ def gdal_read_array(vrt, x0, y0, x1, y1):
          "-outsize", str(w), str(h), str(vrt), "/vsistdout/"],
         capture_output=True, text=True, check=True)
     import numpy as np
-    lines = [l for l in r.stdout.splitlines() if l and not l.startswith(("ncols", "nrows", "xllcorner", "yllcorner", "cellsize", "NODATA_value"))]
-    return np.array([[float(v) for v in l.split()] for l in lines], dtype=np.float32)
+    # ne garder que les lignes numeriques (l'AAIGrid vers stdout embarque
+    # aussi l'en-tete et une ligne de projection)
+    lignes = []
+    for l in r.stdout.splitlines():
+        l = l.strip()
+        if not l or not (l[0].isdigit() or l[0] in "-+."):
+            continue
+        lignes.append([float(v) for v in l.split()])
+    if not lignes:
+        raise RuntimeError(f"AAIGrid illisible depuis {vrt}: {r.stdout[:200]!r}")
+    largeur = len(lignes[0])
+    if any(len(l) != largeur for l in lignes):
+        raise RuntimeError(f"grille non rectangulaire depuis {vrt}")
+    return np.array(lignes, dtype=np.float32)
 
 
 def ecrire_masque_gtiff(chemin, masque, x0, y1):
