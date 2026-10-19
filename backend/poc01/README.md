@@ -3,9 +3,14 @@
 Document de référence: [masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md](../../masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md)
 
 **Zone du PoC** : quartier de l'Europe, Tours — 47.422648 / 0.683287
-(L93 : 525363.55 E, 6705039.73 N). Dalle centrale `0525_6705` ;
+(L93 : 525363.55 E, 6705039.73 N). Dalle du point : `0525_6706` ;
 rayon 1 km = 7 dalles :
-`0524_6704 0524_6705 0525_6704 0525_6705 0525_6706 0526_6704 0526_6705`.
+`0524_6705 0524_6706 0525_6705 0525_6706 0525_6707 0526_6705 0526_6706`.
+
+**Convention de carroyage (validée sur les données)** : le nom d'une dalle
+encode son coin **NW** — ouest `X*1000`, nord `Y*1000`. D'où le BBOX WMS-R :
+`{X}999.75,{Y-1}000.25,{X+1}999.75,{Y}000.25`
+(ex. `0525_6706` → `524999.75,6705000.25,525999.75,6706000.25`).
 
 ## Prérequis
 
