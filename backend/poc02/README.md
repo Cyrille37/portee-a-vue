@@ -21,9 +21,20 @@ paramétré — bâti, forêt, ouvrages d'art.
    seuil est gardé, y compris un arbre isolé de quelques cellules 2 m) ;
    simplification Douglas-Peucker (5 m).
 6. **Sortie** : GeoJSON WGS84 (`EPSG:4326`), prêt pour une couche
-   `fill` MapLibre ; chaque polygone porte son aire (`aire_m2`) et les
-   attributs `mnh_max_m` / `mnh_moy_m` (hauteur hors-sol max/moyenne
-   des cellules qu'il couvre) — utiles pour qualifier bâti vs forêt.
+   `fill` MapLibre ; chaque polygone porte les attributs décrits
+   ci-dessous, et la `FeatureCollection` embarque les paramètres du
+   run (`seuil_m`, `rayon_m`, `aire_mini_m2`, `date_generation`,
+   `centre_lat`, `centre_lon`).
+
+## Attributs des features
+
+| Attribut | Description |
+|---|---|
+| `aire_m2` | Surface du polygone en m² — taille de l'emprise au sol de l'obstacle. |
+| `mnh_min_m` | Hauteur hors-sol minimale des cellules du polygone — pour un arbre, départ de la canopée ; pour un bâtiment, niveau de sa base. |
+| `mnh_max_m` | Hauteur hors-sol maximale des cellules du polygone — le point le plus haut de l'objet (cime, faitage, antenne). |
+| `mnh_moy_m` | Hauteur hors-sol moyenne des cellules du polygone — ordre de grandeur de l'objet, utile pour qualifier bâti élevé vs canopée. |
+| `mns_max_m` | Altitude absolue (NGF) du point le plus haut de l'objet — directement comparable au futur masque-observateur, et candidat « point haut » pour un répéteur. |
 
 ## Outils
 
