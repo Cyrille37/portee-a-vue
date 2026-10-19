@@ -6,7 +6,7 @@ set -euo pipefail
 produit="${1:?usage: ingest.sh <MNS|MNT> <XXXX_YYYY>}"
 dalle="${2:?usage: ingest.sh <MNS|MNT> <XXXX_YYYY>}"
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 X="${dalle%%_*}"; Y="${dalle##*_}"
 
 src="${ROOT}/data/downloads/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
@@ -16,13 +16,15 @@ dst="${dst_dir}/LHD_FXX_${X}_${Y}_${produit}_O_0M50_LAMB93_IGN69.tif"
 [ -f "${src}" ] || { echo "Dalle source absente: ${src}"; exit 1; }
 mkdir -p "${dst_dir}"
 
-gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE \
-  -mo "SOURCE_PRODUIT=${produit}_LIDAR_HD" \
+gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE -q \
+  "${src}" "${dst}"
+
+gdal_edit -mo "SOURCE_PRODUIT=${produit}_LIDAR_HD" \
   -mo "SOURCE_DALLE=LHD_FXX_${X}_${Y}" \
   -mo "SOURCE_PAS=0.5m" \
   -mo "INGEST_DATE=$(date +%F)" \
   -mo "INGEST_OUTIL=gdalwarp $(gdalinfo --version | grep -o '[0-9.]*') / r=max, tr=2m, Int16" \
-  "${src}" "${dst}"
+  "${dst}"
 
 rm -f "${src}"
 ls -lh "${dst}"

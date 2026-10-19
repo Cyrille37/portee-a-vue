@@ -6,7 +6,7 @@ set -euo pipefail
 produit="${1:?usage: download.sh <MNS|MNT> <XXXX_YYYY>}"
 dalle="${2:?usage: download.sh <MNS|MNT> <XXXX_YYYY>}"
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 X="${dalle%%_*}"; Y="${dalle##*_}"
 
 URL="https://data.geopf.fr/wms-r?SERVICE=WMS&VERSION=1.3.0&EXCEPTIONS=text/xml&REQUEST=GetMap"
