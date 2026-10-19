@@ -2,6 +2,11 @@
 
 Document de référence: [masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md](../../masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md)
 
+**Zone du PoC** : quartier de l'Europe, Tours — 47.422648 / 0.683287
+(L93 : 525363.55 E, 6705039.73 N). Dalle centrale `0525_6705` ;
+rayon 1 km = 7 dalles :
+`0524_6704 0524_6705 0525_6704 0525_6705 0525_6706 0526_6704 0526_6705`.
+
 ## Prérequis
 
 Tous les outils sont gratuits et standard ; rien d'autre n'est indispensable
@@ -46,4 +51,42 @@ Les tuiles 2 m sont des **produits dérivés** ; les MNS/MNT 50 cm sont leurs **
 4. la tuile garde le nom et l'emprise de la dalle IGN — le carroyage national devient l'index.
 
 MNS et MNT sont ingérés de la même façon dans des sous-répertoires (`mns/`, `mnt/`) sur le même carroyage ; le MNH n'est jamais stocké : il se calcule à la demande par différence (MNS − MNT).
+
+## Téléchargement des dalles (découverte clé)
+
+Les produits MNS/MNT LiDAR HD **ne sont pas diffusés via l'API Atom**
+`data.geopf.fr/telechargement` (seuls les nuages de points y figurent,
+dataset `LiDARHD-NUALID`). L'accès programme aux dalles MNS/MNT passe par :
+
+- le **WFS `IGNF_LIDAR-HD_METADONNEE:metadata`**
+  (`https://data.geopf.fr/wfs/ows`) qui liste les 524 687 dalles avec,
+  pour chacune, les attributs `url_mns`, `url_mnt`, `url_mnh`, `url_npl`,
+  `code_mission`, dates d'acquisition, capteur… ;
+- le **service WMS-R** (`https://data.geopf.fr/wms-r`) qui sert chaque dalle
+  en GeoTIFF (2000×2000 px, pas 50 cm, float32, nodata −9999) via un GetMap
+  dérivé par arithmétique du carroyage :
+  `BBOX = {X}999.75,{Y}000.25,{X+1}999.75,{Y+1}000.25`.
+
+Les tuiles sont donc téléchargées par WMS-R direct (moins d'indirection),
+le WFS métadonnées restant la source des attributs de traçabilité (mission,
+dates de vol).
+
+## Outils du PoC
+
+Depuis `backend/poc01` :
+
+- `make doctor` — vérifie les prérequis ;
+- `make download` — télécharge les 7 dalles MNS + MNT (~16 Mo chacune)
+  dans `backend/data/downloads/` (flux « une dalle à la fois ») ;
+- `make ingest` — transforme chaque dalle en tuile 2 m Int16
+  (`gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE`) avec balises de
+  traçabilité, supprime la source 50 cm ;
+- `make vrt` — assemble `backend/data/mns.vrt` et `mnt.vrt` ;
+- scripts unitaires : `scripts/download.sh <MNS|MNT> <XXXX_YYYY>`,
+  `scripts/ingest.sh <MNS|MNT> <XXXX_YYYY>`.
+
+Vérifications faites sur la dalle centrale (0525_6705) :
+GeoTIFF 2000×2000 float32, emprise exacte 525999.75–526999.75 /
+6705000.25–6706000.25, z sol ≈ 101 m NGF au point Europe (MNS = MNT :
+point en rue, pas de sursol), max MNS 149 m (bâti), max MNT 106 m.
 
