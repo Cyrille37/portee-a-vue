@@ -167,9 +167,13 @@ def main():
             print("  avertissement: stats MNH indisponibles"
                   f" (gdal_rasterize: {r_rast.stderr.strip()[:120]})")
 
+        # export GeoJSON : uniquement les obstacles (DN > 0 — le fond
+        # DN=0 n'est pas un obstacle), sans les attributs techniques
         gj = subprocess.run(
             ["ogr2ogr", "-f", "GeoJSON", "-t_srs", "EPSG:4326",
-             "-simplify", str(SIMPLIFIE_M), "/vsistdout/", str(gpkg)],
+             "-simplify", str(SIMPLIFIE_M),
+             "-where", "DN > 0", "-select", "DN",
+             "/vsistdout/", str(gpkg)],
             check=True, capture_output=True, text=True).stdout
 
     # stats zonales MNH par polygone (identifiant = valeur DN du GPKG)
@@ -194,12 +198,13 @@ def main():
             continue
         aire = aire_polygone(f["geometry"]["coordinates"][0])
         if aire >= AIRE_MINI_M2:
-            f["properties"]["aire_m2"] = round(aire, 1)
+            props = {"aire_m2": round(aire, 1)}
             gid = f["properties"].get("DN")
             mx, moy = stats.get(gid, (None, None))
             if mx is not None:
-                f["properties"]["mnh_max_m"] = mx
-                f["properties"]["mnh_moy_m"] = moy
+                props["mnh_max_m"] = mx
+                props["mnh_moy_m"] = moy
+            f["properties"] = props
             gardes.append(f)
     fc["features"] = gardes
     print(f"  polygones vectorisés: {total}, gardés (aire >= {AIRE_MINI_M2:.0f} m²): {len(gardes)}")
