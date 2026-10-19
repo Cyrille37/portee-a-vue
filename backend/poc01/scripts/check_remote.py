@@ -22,13 +22,15 @@ R = 900  # marge : rester dans le disque couvert
 NB_POINTS = 10
 TOLERANCE_M = 5.0
 
-# L93 -> WGS84 pour l'API (grille suffisamment précise pour ~1 m sur 1 km ;
-# on utilise cs2cs de GDAL, déjà requis)
+# L93 -> WGS84 pour l'API, via gdaltransform (gdal-bin, déjà requis)
 def l93_to_wgs84(x, y):
-    r = subprocess.run(["cs2cs", "EPSG:2154", "EPSG:4326", "-f", "%.6f",
-                        str(x), str(y)], capture_output=True, text=True, check=True)
-    lon, lat = r.stdout.split()[0:2]
-    return float(lon), float(lat)
+    r = subprocess.run(["gdaltransform", "-s_srs", "EPSG:2154", "-t_srs", "EPSG:4326"],
+                       input=f"{x} {y}\n", capture_output=True, text=True, check=True)
+    try:
+        lon, lat = r.stdout.split()[0:2]
+        return float(lon), float(lat)
+    except (IndexError, ValueError):
+        raise RuntimeError(f"gdaltransform illisible: {r.stdout!r} / {r.stderr!r}")
 
 
 def vrt_z(vrt, x, y):
