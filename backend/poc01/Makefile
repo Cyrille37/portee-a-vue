@@ -12,11 +12,15 @@ help:
 	@echo "Cibles: doctor | download | ingest | vrt | check | check-remote | clean"
 
 doctor:
-	@command -v gdalinfo >/dev/null || { echo "GDAL manquant (apt install gdal-bin)"; exit 1; }
-	@command -v curl >/dev/null   || { echo "curl manquant"; exit 1; }
+	@for t in gdalinfo gdalwarp gdalbuildvrt gdallocationinfo gdaltransform curl unzip; do \
+	  command -v $$t >/dev/null || { echo "outil manquant: $$t (apt install gdal-bin curl unzip)"; exit 1; }; \
+	done
+	@command -v gdal_edit >/dev/null || command -v gdal_edit.py >/dev/null \
+	  || { echo "outil manquant: gdal_edit ou gdal_edit.py (apt install gdal-bin)"; exit 1; }
+	@python3 -c "import numpy; print('numpy', numpy.__version__)" \
+	  || { echo "numpy manquant (apt install python3-numpy)"; exit 1; }
 	@gdalinfo --version
-	@python3 -c "import numpy; print('numpy', numpy.__version__)"
-	@sqlite3 --version
+	@sqlite3 --version || true
 	@echo "OK"
 
 download:
