@@ -59,7 +59,10 @@ def main():
             check(abs(gt[1] - 2.0) < 1e-9 and abs(gt[5] + 2.0) < 1e-9,
                   f"{nom}: pas {gt[1]},{gt[5]} != 2 m")
             X, Y = int(dalle.split("_")[0]), int(dalle.split("_")[1])
-            check(abs(gt[0] - X * 1000) <= 1.0 and abs(gt[3] - (Y + 1) * 1000) <= 1.0,
+            # le gdalwarp conserve l'alignement pixel de la source 50 cm :
+            # origine = coin dalle - 0.25 m (demi-pixel)
+            check(abs(gt[0] - (X * 1000 - 0.25)) <= 1.0
+                  and abs(gt[3] - ((Y + 1) * 1000 + 0.25)) <= 1.0,
                   f"{nom}: origine ({gt[0]},{gt[3]}) hors dalle {dalle}")
 
             tags = j["metadata"].get("", {})
@@ -87,12 +90,13 @@ def main():
         if not vrt.exists():
             continue
         x, y = EUROPE_L93
-        r = subprocess.run(["gdallocationinfo", "-xml", str(vrt), str(x), str(y)],
+        r = subprocess.run(["gdallocationinfo", "-geoloc", str(vrt), str(x), str(y)],
                            capture_output=True, text=True, check=True)
         try:
-            z = float(r.stdout.split("<Value>")[1].split("</Value>")[0])
-        except (IndexError, ValueError):
-            ERREURS.append(f"{produit}.vrt: gdallocationinfo illisible")
+            z = float(next(l.split(":")[1] for l in r.stdout.splitlines()
+                          if l.strip().startswith("Value:")))
+        except (StopIteration, ValueError):
+            ERREURS.append(f"{produit}.vrt: gdallocationinfo illisible ({r.stdout.strip()!r})")
             continue
         print(f"  {produit.upper()} au point Europe (L93 {x:.2f} {y:.2f}): {z:.1f} m NGF")
 
