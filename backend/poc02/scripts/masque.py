@@ -150,16 +150,27 @@ def main():
                        check=True, capture_output=True)
 
         # raster d'identifiants: chaque polygone polygonise remplace ses
-        # cellules par son index (attribut DN) -> stats zonales directes
+        # cellules par son index (attribut DN) -> stats zonales directes.
+        # -te/-tr explicites: gdal_rasterize ne peut pas deviner la grille.
+        # En cas d'echec, le masque est produit sans stats (non bloquant).
         tif_id = td / "ids.tif"
-        subprocess.run(["gdal_rasterize", "-a", "DN", "-l", "obstacles",
-                        str(gpkg), str(tif_id)],
-                       check=True, capture_output=True)
+        r_rast = subprocess.run(
+            ["gdal_rasterize", "-a", "DN", "-l", "obstacles",
+             "-te", str(x0), str(y0), str(x1), str(y1),
+             "-tr", str(PAS), str(PAS), "-ot", "Int32",
+             str(gpkg), str(tif_id)],
+            capture_output=True, text=True)
+        ids = None
+        if r_rast.returncode == 0:
+            ids = _lire_pgm_ou_gtiff(tif_id, masque.shape)
+        else:
+            print("  avertissement: stats MNH indisponibles"
+                  f" (gdal_rasterize: {r_rast.stderr.strip()[:120]})")
+
         gj = subprocess.run(
             ["ogr2ogr", "-f", "GeoJSON", "-t_srs", "EPSG:4326",
              "-simplify", str(SIMPLIFIE_M), "/vsistdout/", str(gpkg)],
             check=True, capture_output=True, text=True).stdout
-        ids = _lire_pgm_ou_gtiff(tif_id, masque.shape)
 
     # stats zonales MNH par polygone (identifiant = valeur DN du GPKG)
     stats = {}
