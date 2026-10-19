@@ -121,7 +121,10 @@ Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6705_MNS_O_0M50_LAMB93_IGN69.
   option name '-mo'`) — d'où le `gdal_edit` séparé ;
 - les boucles `download`/`ingest` du Makefile sont *fail-fast* : une dalle
   manquante arrête l'ingestion plutôt que de supprimer une source non
-  transformée.
+  transformée ;
+- `gdalinfo -stats` (donc `make check`) dépose des `.tif.aux.xml` à côté des
+  tuiles : cache GDAL des statistiques, régénérable, ignoré par git,
+  supprimé par `make clean`.
 
 ## Vérifications faites sur la dalle du point (0525_6706, BBOX
 524999.75–525999.75 / 6705000.25–6706000.25)

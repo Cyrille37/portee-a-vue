@@ -45,3 +45,6 @@ check:
 
 clean:
 	rm -f ../data/mns.vrt ../data/mnt.vrt
+	rm -f ../data/mns/*.tif ../data/mns/*.tif.aux.xml
+	rm -f ../data/mnt/*.tif ../data/mnt/*.tif.aux.xml
+	rm -rf ../data/downloads/*
