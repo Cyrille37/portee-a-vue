@@ -1,18 +1,18 @@
 # PoC02 - Masque d'altitude
 # Réutilise les données du PoC01 (backend/data/*.vrt)
+# La zone d'exploration = l'emprise des VRT (plus de centre/rayon en dur)
 
 SEUIL ?= 10
-RAYON ?= 1000
 OUT ?= masque.geojson
 AIRE_MINI ?= 0
 
 .PHONY: doctor masque help
 
 help:
-	@echo "Cibles: doctor | masque [SEUIL=10] [RAYON=1000] [AIRE_MINI=0] [OUT=masque.geojson]"
+	@echo "Cibles: doctor | masque [SEUIL=10] [AIRE_MINI=0] [OUT=masque.geojson]"
 
 doctor:
-	@for t in gdal_translate gdal_rasterize ogr2ogr python3; do \
+	@for t in gdal_translate gdalinfo gdal_rasterize ogr2ogr gdaltransform python3; do \
 	  command -v $$t >/dev/null || { echo "outil manquant: $$t (apt install gdal-bin python3)"; exit 1; }; \
 	done
 	@command -v gdal_polygonize >/dev/null || command -v gdal_polygonize.py >/dev/null \
@@ -23,4 +23,4 @@ doctor:
 	@echo "OK"
 
 masque:
-	@python3 scripts/masque.py --seuil $(SEUIL) --rayon $(RAYON) --aire-mini $(AIRE_MINI) --out $(OUT)
+	@python3 scripts/masque.py --seuil $(SEUIL) --aire-mini $(AIRE_MINI) --out $(OUT)

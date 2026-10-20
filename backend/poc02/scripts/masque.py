@@ -2,11 +2,12 @@
 """PoC02 - Masque d'altitude : polygones des obstacles hors-sol (MNH > seuil).
 
 Usage:
-    python3 scripts/masque.py [--seuil 10] [--rayon 1000] [--out masque.geojson]
+    python3 scripts/masque.py [--seuil 10] [--out masque.geojson]
 
-Pipeline : lit les VRT MNS/MNT du PoC01, calcule MNH = MNS - MNT à la
-demande, produit un masque binaire (MNH > seuil), vectorise via
-gdal_polygonize, nettoie (micro-polygones) et sort un GeoJSON WGS84.
+Pipeline : lit les VRT MNS/MNT du PoC01 (leur emprise EST la zone
+d'exploration), calcule MNH = MNS - MNT, produit un masque binaire
+(MNH > seuil), vectorise via gdal_polygonize, nettoie (micro-polygones)
+et sort un GeoJSON WGS84.
 """
 import argparse
 import json
@@ -18,18 +19,35 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent  # backend/
 DATA = ROOT / "data"
-EUROPE_L93 = (525363.55, 6705039.73)
-SIMPLIFIE_M = 5.0
-PAS = 2.0  # résolution des tuiles PoC01
+SIMPLIFIE_M = 5.0  # simplification geometrique a l'export GeoJSON
 
 
-def gdal_read_array(vrt, x0, y0, x1, y1):
+def gdalinfo_extent(vrt):
+    """Emprise L93 + taille + pas d'un VRT via gdalinfo -json.
+
+    Retourne (x0, y0, x1, y1, largeur, hauteur, pas_x, pas_y) ou None
+    si le VRT ne peut pas etre lu.
+    """
+    r = subprocess.run(["gdalinfo", "-json", str(vrt)],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return None
+    try:
+        info = json.loads(r.stdout)
+        w, h = info["size"]
+        ul = info["cornerCoordinates"]["upperLeft"]
+        lr = info["cornerCoordinates"]["lowerRight"]
+        gt = info["geoTransform"]
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (ul[0], lr[1], lr[0], ul[1], w, h, abs(gt[1]), abs(gt[5]))
+
+
+def gdal_read_array(vrt, x0, y0, x1, y1, w, h):
     """Lit la fenêtre L93 [x0,y0,x1,y1] du VRT -> array numpy (float).
 
     Utilise gdal_translate -> /vsistdout/ en AAIGrid (texte, robuste).
     """
-    w = max(1, int(round((x1 - x0) / PAS)))
-    h = max(1, int(round((y1 - y0) / PAS)))
     r = subprocess.run(
         ["gdal_translate", "-of", "AAIGrid", "-co", "DECIMAL_PRECISION=1",
          "-projwin", str(x0), str(y1), str(x1), str(y0),
@@ -52,15 +70,17 @@ def gdal_read_array(vrt, x0, y0, x1, y1):
     return np.array(lignes, dtype=np.float32)
 
 
-def ecrire_masque_gtiff(chemin, masque, x0, y1):
-    """Écrit le masque binaire en GeoTIFF (via PGM binaire, lu par GDAL)."""
+def ecrire_masque_gtiff(chemin, masque, x0, y1, pas_x, pas_y):
+    """
+    Écrit le masque binaire en GeoTIFF (via PGM binaire, lu par GDAL).
+    """
     h, w = masque.shape
     with open(chemin.with_suffix(".pgm"), "wb") as f:
         f.write(b"P5\n%d %d\n255\n" % (w, h))
         f.write(masque.tobytes())
     subprocess.run(
         ["gdal_translate", "-of", "GTiff", "-ot", "Byte", "-a_srs", "EPSG:2154",
-         "-a_ullr", str(x0), str(y1), str(x0 + w * PAS), str(y1 - h * PAS),
+         "-a_ullr", str(x0), str(y1), str(x0 + w * pas_x), str(y1 - h * pas_y),
          str(chemin.with_suffix(".pgm")), str(chemin)],
         check=True, capture_output=True)
 
@@ -88,6 +108,15 @@ def _lire_pgm_ou_gtiff(chemin, forme_attendue):
     return a if a.shape == forme_attendue else None
 
 
+def l93_vers_wgs84(x, y):
+    """Convertit un point L93 en WGS84 (lat, lon) via gdaltransform."""
+    r = subprocess.run(
+        ["gdaltransform", "-s_srs", "EPSG:2154", "-t_srs", "EPSG:4326"],
+        input=f"{x} {y}", capture_output=True, text=True, check=True)
+    lon, lat = (float(v) for v in r.stdout.split()[:2])
+    return lat, lon
+
+
 def aire_polygone(ring):
     """Aire d'un anneau en WGS84, convertie en m² (échelle locale).
 
@@ -110,8 +139,6 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--seuil", type=float, default=10.0,
                     help="hauteur hors-sol (m) au-delà de laquelle une cellule est obstacle (défaut: 10)")
-    ap.add_argument("--rayon", type=float, default=1000.0,
-                    help="rayon du disque analysé (m) autour du point Europe (défaut: 1000)")
     ap.add_argument("--out", default="masque.geojson", help="fichier GeoJSON de sortie")
     ap.add_argument("--aire-mini", type=float, default=0.0,
                     help="aire minimale d'un polygone en m² (défaut: 0 = tout "
@@ -124,12 +151,32 @@ def main():
             print(f"{v} absent: lancer make -C ../poc01 vrt", file=sys.stderr)
             sys.exit(1)
 
-    cx, cy = EUROPE_L93
-    x0, x1 = cx - args.rayon, cx + args.rayon
-    y0, y1 = cy - args.rayon, cy + args.rayon
+    # la zone d'exploration = l'emprise des VRT (intersection MNS/MNT)
+    ext_mns = gdalinfo_extent(vrt_mns)
+    ext_mnt = gdalinfo_extent(vrt_mnt)
+    if ext_mns is None or ext_mnt is None:
+        print("emprise des VRT illisible (gdalinfo -json)", file=sys.stderr)
+        sys.exit(1)
+    x0 = max(ext_mns[0], ext_mnt[0])
+    y0 = max(ext_mns[1], ext_mnt[1])
+    x1 = min(ext_mns[2], ext_mnt[2])
+    y1 = min(ext_mns[3], ext_mnt[3])
+    if x1 <= x0 or y1 <= y0:
+        print("VRT MNS et MNT sans zone commune", file=sys.stderr)
+        sys.exit(1)
+    pas_x = min(ext_mns[6], ext_mnt[6])
+    pas_y = min(ext_mns[7], ext_mnt[7])
+    w = max(1, int(round((x1 - x0) / pas_x)))
+    h = max(1, int(round((y1 - y0) / pas_y)))
+    if (w, h) != (ext_mns[4], ext_mns[5]):
+        print(f"avertissement: emprises MNS/MNT differentes, "
+              f"analyse limitee a l'intersection L93 [{x0:.1f}, {y0:.1f}, {x1:.1f}, {y1:.1f}]")
 
-    mns = gdal_read_array(vrt_mns, x0, y0, x1, y1)
-    mnt = gdal_read_array(vrt_mnt, x0, y0, x1, y1)
+    print(f"  zone d'exploration (emprise des VRT): {w} x {h} cellules de "
+          f"{pas_x:g} m ({(x1 - x0):.0f} x {(y1 - y0):.0f} m)")
+
+    mns = gdal_read_array(vrt_mns, x0, y0, x1, y1, w, h)
+    mnt = gdal_read_array(vrt_mnt, x0, y0, x1, y1, w, h)
     if mns.shape != mnt.shape:
         print(f"formes MNS/MNT incohérentes: {mns.shape} vs {mnt.shape}", file=sys.stderr)
         sys.exit(1)
@@ -145,7 +192,7 @@ def main():
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
         tif = td / "masque.tif"
-        ecrire_masque_gtiff(tif, masque, x0, y1)
+        ecrire_masque_gtiff(tif, masque, x0, y1, pas_x, pas_y)
 
         gpkg = td / "masque.gpkg"
         subprocess.run(["gdal_polygonize.py", str(tif), "-f", "GPKG",
@@ -160,7 +207,7 @@ def main():
         r_rast = subprocess.run(
             ["gdal_rasterize", "-a", "DN", "-l", "obstacles",
              "-te", str(x0), str(y0), str(x1), str(y1),
-             "-tr", str(PAS), str(PAS), "-ot", "Int32",
+             "-tr", str(pas_x), str(pas_y), "-ot", "Int32",
              str(gpkg), str(tif_id)],
             capture_output=True, text=True)
         ids = None
@@ -183,7 +230,6 @@ def main():
     # mnh min/max/moy et mns max, pour qualifier chaque obstacle
     stats = {}
     if ids is not None and ids.shape == mnh.shape:
-        import numpy as np
         ordre = np.argsort(ids, axis=None)
         ids_tri = ids.flatten()[ordre]
         mnh_tri = mnh.flatten()[ordre]
@@ -213,13 +259,15 @@ def main():
             gardes.append(f)
     fc["features"] = gardes
 
+    centre_lat, centre_lon = l93_vers_wgs84((x0 + x1) / 2.0, (y0 + y1) / 2.0)
     # parametres du run au niveau de la FeatureCollection
     fc["properties"] = {
         "seuil_m": args.seuil,
-        "rayon_m": args.rayon,
+        "zone_l93": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
         "aire_mini_m2": args.aire_mini,
         "date_generation": datetime.now().isoformat(timespec="seconds"),
-        "centre_lat": 47.422648, "centre_lon": 0.683287,
+        "centre_lat": round(centre_lat, 6),
+        "centre_lon": round(centre_lon, 6),
     }
     fc.pop("name", None)
     print(f"  polygones obstacles vectorisés: {total}, "
