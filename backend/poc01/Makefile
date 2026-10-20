@@ -24,17 +24,21 @@ doctor:
 	@echo "OK"
 
 download:
-	@for p in $(PRODUITS); do \
+	@total=$$(( $(words $(PRODUITS)) * $(words $(DALLES)) )); n=0; \
+	for p in $(PRODUITS); do \
 	  for d in $(DALLES); do \
-	    echo "== $$p $$d"; \
+	    n=$$((n+1)); \
+	    echo "== $$p $$d - $$n / $$total"; \
 	    ./scripts/download.sh $$p $$d || exit 1; \
 	  done; \
 	done
 
 ingest:
-	@for p in $(PRODUITS); do \
+	@total=$$(( $(words $(PRODUITS)) * $(words $(DALLES)) )); n=0; \
+	for p in $(PRODUITS); do \
 	  for d in $(DALLES); do \
-	    echo "== $$p $$d"; \
+	    n=$$((n+1)); \
+	    echo "== $$p $$d - $$n / $$total"; \
 	    ./scripts/ingest.sh $$p $$d || exit 1; \
 	  done; \
 	done
