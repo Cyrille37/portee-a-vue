@@ -323,15 +323,15 @@ def main():
                        check=True, capture_output=True)
 
         # champ d'identifiant unique par polygone : le DN polygonise vaut
-        # la valeur du raster (0/1), PAS un id par polygone — d'ou un
-        # rowid expose comme champ "poly_id" avant la rasterisation.
-        # (pas de champ nomme "id" : le driver GPKG le promeut en FID
-        # et ne l'expose plus comme attribut — gdal_rasterize/-select
-        # echoueraient avec "Failed to find field id")
+        # la valeur du raster (0/1), PAS un id par polygone. Il faut exposer
+        # le rowid comme ATTRIBUT : un simple alias (rowid AS poly_id) fait
+        # de lui le FID de la couche destination (le champ disparait des
+        # attributs — "Failed to find field poly_id" dans gdal_rasterize).
+        # L'expression "rowid + 0" force un vrai champ entier.
         gpkg_id = td / "masque_id.gpkg"
         subprocess.run(
             ["ogr2ogr", str(gpkg_id), str(gpkg),
-             "-sql", "SELECT rowid AS poly_id, DN FROM masque",
+             "-sql", "SELECT rowid + 0 AS poly_id, DN FROM masque",
              "-nln", "masque"],
             check=True, capture_output=True, text=True)
 
