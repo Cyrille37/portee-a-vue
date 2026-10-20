@@ -30,7 +30,9 @@ paramétré — bâti, forêt, ouvrages d'art.
    calculé depuis l'emprise des VRT).
 
 Note : le temps de traitement est proportionnel à la taille de la zone
-ingérée dans le Poc 01 — c'est normal et attendu.
+ingérée dans le Poc 01 — c'est normal et attendu. La lecture MNS/MNT
+est découpée en tuiles de 2048 x 2048 cellules pour que la RAM de
+lecture reste bornée quelle que soit la taille de la zone.
 
 ## Attributs des features
 
@@ -61,7 +63,12 @@ Paramètres :
 |---|---|---|
 | `--seuil` | 10 | hauteur hors-sol (m) au-delà de laquelle une cellule est un obstacle |
 | `--aire-mini` | 0 | aire minimale d'un polygone (m²) — 0 = tout conserver |
+| `--tuile` | 2048 | côté d'une tuile de lecture (cellules) — borne la RAM de lecture |
 | `--out` | masque.geojson | fichier de sortie |
+
+Note mémoire : la lecture et les stats sont découpées en tuiles, mais
+les grilles MNS/MNH/masque restent en RAM (~9 octets/cellule, soit
+~4,4 Go pour la zone de test 36 x 54 km à 2 m). C'est le pipelineminimal pour garder un GeoJSON strictement identique (polygonizesur le masque complet, obstacles jamais coupés entre tuiles).
 
 ## Prérequis
 
