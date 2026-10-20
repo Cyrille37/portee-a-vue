@@ -148,10 +148,66 @@ volontairement pour valider l'algorithme R3 sur le même socle —
 l'archive de l'implémentation précédente (branche `archive-viewshed-r3-wang`)
 n'est plus poussée sur le remote.
 
+## Comparaison avec `gdal_viewshed` (test croisé)
+
+`gdal_viewshed` est une implémentation R3 validée — un test croisé sur
+la même fenêtre vérifie l'implémentation maison : aux mêmes paramètres,
+les deux masques doivent être quasi identiques (écarts attendus sur les
+bords : angle de numérisation interne différent, échantillonnage
+adaptatif maison).
+
+Correspondance des paramètres (notre implémentation → `gdal_viewshed`) :
+
+| Notre paramètre | Équivalent `gdal_viewshed` | Note |
+|---|---|---|
+| `--hauteur` (antenne) | `-oz` = altitude du centre + hauteur | le run maison affiche « observateur à Z m NGF » — reprendre ce Z pour `-oz` |
+| `--cible` (hauteur cible) | `-tz` | 0 = sol |
+| `--k` = 7/6 (réfraction) | `-cc` = 6/7 ≈ 0.85714 | `-cc` = 1/k : 0.85714 est exactement k = 7/6 |
+| `--rayon` | `-r` | mètres (coordonnées terrain) |
+| position du centre | `-ox`/`-oy` | en **pixels** depuis le coin haut-gauche (pas en coordonnées terrain) |
+
+Commandes — depuis `backend/poc04`, après un run du script qui affiche
+l'altitude de l'observateur (`observateur à Z m NGF`, ligne à reprendre
+pour `-oz`) :
+
+```bash
+# 1. l'implémentation maison (sortie: viewshed.geojson + stats par anneau)
+#    — note la ligne « observateur à Z m NGF » : reprendre Z pour -oz ci-dessous
+make viewshed LAT=47.810322 LON=0.983288 RAYON=40000 HAUTEUR=30 OUT=vs40k.geojson
+
+# 2. la fenêtre MNS du disque, même géométrie que la maison :
+#    centre L93 (affiché par le run) +- RAYON — adapter ulx uly lrx lry
+gdal_translate -projwin <CX-R> <CY+R> <CX+R> <CY-R> \
+  ../data/mns.vrt fenetre40k.tif
+
+# 3. gdal_viewshed sur la même fenêtre — -ox/-oy en PIXELS depuis le
+#    coin haut-gauche : R / pas (ex. 40000 / 2 = 20000)
+gdal_viewshed fenetre40k.tif vs40k_gdal.tif \
+  -ox 20000 -oy 20000 \
+  -oz 127 -tz 0 \
+  -cc 0.85714 -r 40000 \
+  -om NORMAL
+```
+
+Notes :
+
+- `-ox/-oy` sont en **pixels** depuis le coin haut-gauche (pas en
+  coordonnées terrain) : pour un centre à `R` du bord, c'est `-ox R/pas
+  -oy R/pas` (ex. 40 km / 2 m = 20000) ; `-oz` en unités du MNT (m NGF).
+- `gdal_viewshed` utilise le **MNS** qu'on lui donne : la même fenêtre
+  `fenetre40k.tif` est donc la référence commune aux deux runs.
+- `-om NORMAL` donne 1 = visible / 0 = invisible, comparable au masque
+  binaire de la maison avant polygonisation.
+- Le désaccord attendu se concentre près des frontières de visibilité
+  (cellules limites) et aux grands angles entre rayons de la maison
+  (fusion « au moins un rayon » légèrement optimiste) ; un taux de
+  désaccord global de quelques % valide l'implémentation.
+
 ## Prérequis
 
 Ceux du Poc 01 (`make -C ../poc01 doctor`), `gdalinfo` et `gdaltransform`
 (inclus dans `gdal-bin`), `numpy` (non fourni par `gdal-bin` :
-`apt install python3-numpy`).
+`apt install python3-numpy`), et `gdal_viewshed` pour le test croisé
+(ci-dessus).
 
 Les données doivent être ingérées (`make -C ../poc01 download ingest vrt`).
