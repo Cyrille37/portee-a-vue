@@ -1,0 +1,2 @@
+*.geojson
+__pycache__/
