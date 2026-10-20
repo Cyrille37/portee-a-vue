@@ -24,7 +24,7 @@ jamais celui de toute la zone).
 """
 import argparse
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import subprocess
 import sys
 import tempfile
@@ -40,8 +40,9 @@ TUILE_DEFAUT = 2048  # cote d'une tuile de lecture (cellules)
 def gdalinfo_extent(vrt):
     """Emprise L93 + taille + pas d'un VRT via gdalinfo -json.
 
-    Retourne (x0, y0, x1, y1, largeur, hauteur, pas_x, pas_y) ou None
-    si le VRT ne peut pas etre lu.
+    Retourne (x0, y0, x1, y1, largeur, hauteur, pas_x, pas_y, nodata)
+    ou None si le VRT ne peut pas etre lu. nodata = valeur sentinel du
+    raster (None si non declaree).
     """
     r = subprocess.run(["gdalinfo", "-json", str(vrt)],
                        capture_output=True, text=True)
@@ -53,9 +54,10 @@ def gdalinfo_extent(vrt):
         ul = info["cornerCoordinates"]["upperLeft"]
         lr = info["cornerCoordinates"]["lowerRight"]
         gt = info["geoTransform"]
+        nodata = info["bands"][0].get("noDataValue")
     except (KeyError, TypeError, ValueError):
         return None
-    return (ul[0], lr[1], lr[0], ul[1], w, h, abs(gt[1]), abs(gt[5]))
+    return (ul[0], lr[1], lr[0], ul[1], w, h, abs(gt[1]), abs(gt[5]), nodata)
 
 
 def gdal_read_array(vrt, x0, y0, x1, y1, w, h, precision=1):
@@ -82,6 +84,9 @@ def gdal_read_array(vrt, x0, y0, x1, y1, w, h, precision=1):
     largeur = len(lignes[0])
     if any(len(l) != largeur for l in lignes):
         raise RuntimeError(f"grille non rectangulaire depuis {vrt}")
+    if len(lignes) != h:
+        raise RuntimeError(f"grille de {len(lignes)} lignes, {h} attendues, "
+                           f"depuis {vrt}")
     return np.array(lignes, dtype=np.float32)
 
 
@@ -110,7 +115,8 @@ def l93_vers_wgs84(x, y):
 
 
 def lire_mns_masque(vrt_mns, x0, y0, x1, y1, w, h, pas_x, pas_y,
-                    altitude, inverse, tuile, mns_full, masque):
+                    altitude, inverse, nodata, tuile, mns_full, masque,
+                    valide_full):
     """Remplit mns_full/masque tuile par tuile (RAM de lecture bornee).
 
     mns_full est fourni pre-alloue (float32, h x w) car les stats zonales
@@ -129,10 +135,13 @@ def lire_mns_masque(vrt_mns, x0, y0, x1, y1, w, h, pas_x, pas_y,
             x_d = x0 + (rx + tw) * pas_x
             mns_t = gdal_read_array(vrt_mns, x_g, y_bot, x_d, y_haut, tw, th)
             mns_full[ry:ry + th, rx:rx + tw] = mns_t
+            valide_t = np.ones(mns_t.shape, dtype=bool) if nodata is None \
+                else mns_t != nodata
+            valide_full[ry:ry + th, rx:rx + tw] = valide_t
             if inverse:
-                masque[ry:ry + th, rx:rx + tw] = mns_t <= altitude
+                masque[ry:ry + th, rx:rx + tw] = valide_t & (mns_t <= altitude)
             else:
-                masque[ry:ry + th, rx:rx + tw] = mns_t > altitude
+                masque[ry:ry + th, rx:rx + tw] = valide_t & (mns_t > altitude)
             faite += 1
             print(f"\r  lecture/seuillage: tuile {faite}/{n_tuiles}",
                   end="", flush=True)
@@ -213,6 +222,7 @@ def lire_ids_et_stats(tif_id, mns_full, forme,
     stats = {}
     for gid, (n, somme, mn, mx) in acc.items():
         stats[gid] = {
+            "n_cellules": int(n),
             "mns_min_m": round(mn, 1),
             "mns_moy_m": round(somme / n, 1),
             "mns_max_m": round(mx, 1),
@@ -274,25 +284,34 @@ def main():
     if ext is None:
         print("emprise du VRT illisible (gdalinfo -json)", file=sys.stderr)
         sys.exit(1)
-    x0, y0, x1, y1, w, h, pas_x, pas_y = ext
+    x0, y0, x1, y1, w, h, pas_x, pas_y, nodata = ext
     print(f"  zone d'exploration (emprise du VRT): {w} x {h} cellules de "
           f"{pas_x:g} m ({(x1 - x0):.0f} x {(y1 - y0):.0f} m)")
+    if nodata is not None:
+        print(f"  valeur nodata du raster: {nodata:g} (cellules "
+              f"\u00ab inconnues \u00bb exclues du masque, direct comme inverse)")
 
     go = (w * h) / 1_000_000_000 * 6
     print(f"  memoire de travail attendue: ~{go:.1f} Go "
           f"(grilles MNS/masque en RAM)")
 
-    # grilles pre-allouees : mns gardee pour les stats zonales
+    # grilles pre-allouees : mns gardee pour les stats zonales ;
+    # valide_full marque les cellules non-nodata (le masque inverse ne
+    # doit jamais contenir le nodata)
     mns_full = np.empty((h, w), dtype=np.float32)
     masque = np.empty((h, w), dtype=bool)
+    valide_full = np.empty((h, w), dtype=bool)
     lire_mns_masque(vrt_mns, x0, y0, x1, y1, w, h, pas_x, pas_y,
-                    args.altitude, args.inverse, args.tuile, mns_full, masque)
+                    args.altitude, args.inverse, nodata, args.tuile,
+                    mns_full, masque, valide_full)
 
     masque_u8 = masque.view(np.uint8)  # 0/1, compatible PGM/GTiff Byte
     n = int(masque.sum())
+    n_inconnues = int((~valide_full).sum())
     sens = "en dessous de (<=)" if args.inverse else "au-dessus de (>)"
     print(f"  cellules {sens} {args.altitude:.1f} m NGF: {n} / {masque.size}"
-          f" ({100.0 * n / masque.size:.1f} % de la fenêtre)")
+          f" ({100.0 * n / masque.size:.1f} % de la fenêtre) ;"
+          f" nodata: {n_inconnues} ({100.0 * n_inconnues / masque.size:.1f} %)")
 
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
@@ -303,16 +322,26 @@ def main():
                        str(gpkg), "masque", "DN"],
                        check=True, capture_output=True)
 
-        # raster d'identifiants: chaque polygone polygonise remplace ses
-        # cellules par son index (attribut DN) -> stats zonales directes.
-        # -te/-tr explicites: gdal_rasterize ne peut pas deviner la grille.
-        # En cas d'echec, le masque est produit sans stats (non bloquant).
+        # champ d'identifiant unique par polygone : le DN polygonise vaut
+        # la valeur du raster (0/1), PAS un id par polygone — d'ou un
+        # rowid expose comme champ "id" avant la rasterisation.
+        gpkg_id = td / "masque_id.gpkg"
+        subprocess.run(
+            ["ogr2ogr", str(gpkg_id), str(gpkg),
+             "-sql", "SELECT rowid AS id, DN FROM masque",
+             "-nln", "masque"],
+            check=True, capture_output=True, text=True)
+
+        # raster d'identifiants : chaque cellule prend l'id de son polygone
+        # -> stats zonales par feature. -te/-tr explicites : gdal_rasterize
+        # ne peut pas deviner la grille. En cas d'echec, le masque sort
+        # sans stats (non bloquant).
         tif_id = td / "ids.tif"
         r_rast = subprocess.run(
-            ["gdal_rasterize", "-a", "DN", "-l", "masque",
+            ["gdal_rasterize", "-a", "id", "-l", "masque",
              "-te", str(x0), str(y0), str(x1), str(y1),
              "-tr", str(pas_x), str(pas_y), "-ot", "Int32",
-             str(gpkg), str(tif_id)],
+             str(gpkg_id), str(tif_id)],
             capture_output=True, text=True)
         stats = {}
         if r_rast.returncode == 0:
@@ -335,22 +364,35 @@ def main():
         gj = subprocess.run(
             ["ogr2ogr", "-f", "GeoJSON", "-t_srs", "EPSG:4326",
              "-simplify", str(SIMPLIFIE_M),
-             "-where", "DN > 0", "-select", "DN",
-             "/vsistdout/", str(gpkg)],
+             "-where", "DN > 0", "-select", "id, DN",
+             "/vsistdout/", str(gpkg_id)],
             check=True, capture_output=True, text=True).stdout
 
     fc = json.loads(gj)
     total = len(fc.get("features", []))
+    n_multi = 0
     gardes = []
     for f in fc.get("features", []):
         if f["geometry"]["type"] != "Polygon":
+            n_multi += 1
             continue
-        aire = aire_polygone(f["geometry"]["coordinates"])
+        st = stats.get(f["properties"].get("id"), {})
+        # aire exacte des cellules (nb x pas^2) quand les stats sont
+        # disponibles ; sinon repli sur le lacet de la geometrie simplifiee
+        if "n_cellules" in st:
+            aire = st["n_cellules"] * pas_x * pas_y
+        else:
+            aire = aire_polygone(f["geometry"]["coordinates"])
         if aire >= args.aire_mini:
             props = {"aire_m2": round(aire, 1)}
-            props.update(stats.get(f["properties"].get("DN"), {}))
+            props.update(st)
+            props.pop("n_cellules", None)
+            props.pop("id", None)
             f["properties"] = props
             gardes.append(f)
+    if n_multi:
+        print(f"  avertissement: {n_multi} feature(s) MultiPolygon ignoree(s) "
+              f"(attendu: aucune en pratique)")
     fc["features"] = gardes
 
     centre_lat, centre_lon = l93_vers_wgs84((x0 + x1) / 2.0, (y0 + y1) / 2.0)
@@ -360,11 +402,12 @@ def main():
         "inverse": bool(args.inverse),
         "zone_l93": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
         "aire_mini_m2": args.aire_mini,
-        "date_generation": datetime.now().isoformat(timespec="seconds"),
+        "date_generation": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "centre_lat": round(centre_lat, 6),
         "centre_lon": round(centre_lon, 6),
     }
     fc.pop("name", None)
+    fc.pop("crs", None)  # RFC 7946: WGS84 par defaut, pas de membre crs
     print(f"  polygones vectoris\u00e9s: {total}, "
           f"gard\u00e9s (aire >= {args.aire_mini:.0f} m\u00b2): {len(gardes)}")
     Path(args.out).write_text(json.dumps(fc, ensure_ascii=False), encoding="utf-8")
