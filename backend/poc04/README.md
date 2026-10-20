@@ -16,6 +16,11 @@ est visible si son angle d'élévation dépasse ce maximum courant. O(nb_rayons 
 pas), très rapide, et le coût mémoire est borné par la seule fenêtre
 MNS du disque.
 
+Visible si (z_cellule + cible − z_observateur) / d ≥ tan_max_courant
+- `--cible 0` : visibilité du sol nu (c'est le viewshed cartographique classique) ;
+- `--cible 1.5` : visibilité d'un pair LoRa posé au sol, antenne à 1,5 m — décalage de tout le disque de 1,5 m vers le haut ;
+- `--cible 30` : couverture d'abonnés avec mât de 30 m.
+
 ## Paramètres
 
 | Paramètre | Défaut | Rôle |
