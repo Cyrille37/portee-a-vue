@@ -324,11 +324,14 @@ def main():
 
         # champ d'identifiant unique par polygone : le DN polygonise vaut
         # la valeur du raster (0/1), PAS un id par polygone — d'ou un
-        # rowid expose comme champ "id" avant la rasterisation.
+        # rowid expose comme champ "poly_id" avant la rasterisation.
+        # (pas de champ nomme "id" : le driver GPKG le promeut en FID
+        # et ne l'expose plus comme attribut — gdal_rasterize/-select
+        # echoueraient avec "Failed to find field id")
         gpkg_id = td / "masque_id.gpkg"
         subprocess.run(
             ["ogr2ogr", str(gpkg_id), str(gpkg),
-             "-sql", "SELECT rowid AS id, DN FROM masque",
+             "-sql", "SELECT rowid AS poly_id, DN FROM masque",
              "-nln", "masque"],
             check=True, capture_output=True, text=True)
 
@@ -338,7 +341,7 @@ def main():
         # sans stats (non bloquant).
         tif_id = td / "ids.tif"
         r_rast = subprocess.run(
-            ["gdal_rasterize", "-a", "id", "-l", "masque",
+            ["gdal_rasterize", "-a", "poly_id", "-l", "masque",
              "-te", str(x0), str(y0), str(x1), str(y1),
              "-tr", str(pas_x), str(pas_y), "-ot", "Int32",
              str(gpkg_id), str(tif_id)],
@@ -364,7 +367,7 @@ def main():
         gj = subprocess.run(
             ["ogr2ogr", "-f", "GeoJSON", "-t_srs", "EPSG:4326",
              "-simplify", str(SIMPLIFIE_M),
-             "-where", "DN > 0", "-select", "id, DN",
+             "-where", "DN > 0", "-select", "poly_id, DN",
              "/vsistdout/", str(gpkg_id)],
             check=True, capture_output=True, text=True).stdout
 
@@ -376,7 +379,7 @@ def main():
         if f["geometry"]["type"] != "Polygon":
             n_multi += 1
             continue
-        st = stats.get(f["properties"].get("id"), {})
+        st = stats.get(f["properties"].get("poly_id"), {})
         # aire exacte des cellules (nb x pas^2) quand les stats sont
         # disponibles ; sinon repli sur le lacet de la geometrie simplifiee
         if "n_cellules" in st:
@@ -387,7 +390,7 @@ def main():
             props = {"aire_m2": round(aire, 1)}
             props.update(st)
             props.pop("n_cellules", None)
-            props.pop("id", None)
+            props.pop("poly_id", None)
             f["properties"] = props
             gardes.append(f)
     if n_multi:
