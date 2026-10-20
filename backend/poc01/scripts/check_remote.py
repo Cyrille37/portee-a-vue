@@ -17,8 +17,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 DATA = ROOT / "data"
-EUROPE_L93 = (525363.55, 6705039.73)
-R = 900  # marge : rester dans le disque couvert
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from zone import zone
+
+EUROPE_L93 = zone.point_l93
+R = int(zone.rayon * 0.9)  # marge : rester dans le disque couvert
 NB_POINTS = 10
 TOLERANCE_M = 5.0
 

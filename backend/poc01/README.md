@@ -2,10 +2,18 @@
 
 Document de référence: [masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md](../../masque-d-altitude-&-profils-a↔b-socle-terrain-pour-répéteurs-meshcore.md)
 
-**Zone du PoC** : quartier de l'Europe, Tours — 47.422648 / 0.683287
-(L93 : 525363.55 E, 6705039.73 N). Dalle du point : `0525_6706` ;
-rayon 1 km = 7 dalles :
-`0524_6705 0524_6706 0525_6705 0525_6706 0525_6707 0526_6705 0526_6706`.
+**Zone du PoC** : quartier de l'Europe, Tours — définie dans **`zone.env`**
+(point central WGS84 `LAT`/`LON` + rayon `RAYON_M`). La liste des dalles
+n'est plus écrite nulle part : `scripts/zone.py` convertit le point en
+Lambert-93 (via `gdaltransform`, fallback `pyproj`) et calcule les dalles
+1 km² dont l'emprise touche le disque de rayon `RAYON_M` — avec le point
+actuel (47.422648 / 0.683287, rayon 1 km) cela redonne les 7 dalles
+`0524_6705 … 0526_6706`.
+
+**Changer de zone ou de superficie** = éditer `zone.env` (2 valeurs :
+point + rayon) puis relancer `make download ingest vrt check` — le
+Makefile, `check.py` et `check_remote.py` consomment tous `scripts/zone.py`
+(source unique).
 
 **Convention de carroyage (validée sur les données)** : le nom d'une dalle
 encode son coin **NW** — ouest `X*1000`, nord `Y*1000`. D'où le BBOX WMS-R :

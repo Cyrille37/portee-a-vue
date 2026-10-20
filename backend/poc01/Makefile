@@ -1,10 +1,10 @@
 # PoC01 - Makefile d'orchestration
-# Zone: quartier de l'Europe, Tours (47.422648, 0.683287) - L93: 525363.55 6705039.73
-# Nom de dalle = coin NW (ouest X km, nord Y km). Dalle du point: 0525_6706
-# rayon 1 km = 7 dalles
+# Zone definie dans zone.env (point WGS84 + rayon) ; la liste des dalles
+# est calculee par scripts/zone.py (conversion WGS84->L93 + disque).
+# Nom de dalle = coin NW (ouest X km, nord Y km).
 
 PRODUITS := MNS MNT
-DALLES := 0524_6705 0524_6706 0525_6705 0525_6706 0525_6707 0526_6705 0526_6706
+DALLES := $(shell python3 scripts/zone.py dalles)
 
 .PHONY: doctor download ingest vrt check check-remote clean help
 
