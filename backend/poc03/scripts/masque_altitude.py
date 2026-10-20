@@ -337,6 +337,16 @@ def main():
             table = tables[0]
             pk = [r[1] for r in con.execute(
                 f"PRAGMA table_info({table})") if r[5]][0]
+            # les triggers de l'index spatial RTree (crees par le driver
+            # GPKG) appellent ST_* que le sqlite3 natif n'a pas : l'UPDATE
+            # les declencherait ("no such function: ST_IsEmpty"). Le GPKG
+            # est un fichier temporaire et l'index spatial ne sert plus :
+            # on supprime les triggers avant l'UPDATE.
+            triggers = [r[0] for r in con.execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type = 'trigger' AND tbl_name = ?", (table,))]
+            for t in triggers:
+                con.execute(f"DROP TRIGGER {t}")
             con.execute(f"ALTER TABLE {table} ADD COLUMN poly_id INTEGER")
             con.execute(f"UPDATE {table} SET poly_id = {pk}")
             con.commit()
