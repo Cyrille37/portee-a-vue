@@ -107,6 +107,39 @@ gardait aussi le MNH). C'est le pipeline minimal pour garder un GeoJSON
 strictement identique (polygonize sur le masque complet, zones jamais
 coupées entre tuiles).
 
+## PMTiles ?
+
+Le GeoJSON produit ici est un **artefact d'analyse** : il change à chaque run
+(`ALTITUDE`, `INVERSE`, zone) et est consommé en local par un seul
+utilisateur — le format est donc le bon pour ce PoC. Une conversion en
+PMTiles (tuiles vectorielles dans un seul fichier, servies par requêtes
+HTTP Range sans serveur de tuiles) n'apporte rien dans ce cadre, et
+ferait même perdre :
+
+- **le cycle itératif** — retuilé à chaque changement de seuil, là où le
+  GeoJSON se régénère en une passe ;
+- **le contrôle sémantique** — tippecanoe (l'outil standard de tuilage)
+  généralise et fusionne par zoom : un bâtiment isolé de quelques cellules
+  au-dessus de l'horizon peut disparaître aux petits zooms, alors que
+  c'est précisément ce que le masque cherche à montrer ; il faudrait le
+  configurer en mode conservateur, et l'avantage de légèreté s'efface ;
+- **la fidélité des attributs** — la correspondance feature ↔ polygone
+  devient approximative aux petits zooms (« cliquer un polygone → ses
+  stats » moins fiable).
+
+PMTiles redevient pertinent le jour où le masque **sort du labo** :
+
+- publication web multi-utilisateurs (le premier chargement d'un GeoJSON
+  de plusieurs Mo devient le vrai goulot, PMTiles charge par tuile au
+  zoom courant) ;
+- données **stables** et réutilisées (plusieurs seuils archivés en
+  couches, une seule archive cartographique versionnée) ;
+- zone agrandie — un masque au rayon 50 km du doc de besoin dépasserait
+  sensiblement les ~9 Mo de la zone de test.
+
+Avant d'en arriver là, les premiers leviers si l'affichage MapLibre ralentit :
+`AIRE_MINI` à la génération, ou un filtre par `mns_max_m` — bien avant le tuilage.
+
 ## Prérequis
 
 Ceux du Poc 01 (`make -C ../poc01 doctor`), plus `gdalinfo` et
