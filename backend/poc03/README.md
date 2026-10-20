@@ -39,7 +39,6 @@ les masses — collines ou bâtiments — qui dépassent cet horizon.
    run (`altitude_m`, `inverse`, `zone_l93`, `aire_mini_m2`,
    `date_generation`, `centre_lat`, `centre_lon` — centre WGS84 de la zone
    analysée).
-   `centre_lat`, `centre_lon` — centre WGS84 de la zone analysée).
 
 ## Mode inverse (`--inverse` / `INVERSE=1`)
 
