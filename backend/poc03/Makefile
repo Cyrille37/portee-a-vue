@@ -3,13 +3,14 @@
 # La zone d'exploration = l'emprise du VRT
 
 ALTITUDE ?= 200
+INVERSE ?= 0
 OUT ?= masque.geojson
 AIRE_MINI ?= 0
 
 .PHONY: doctor masque help
 
 help:
-	@echo "Cibles: doctor | masque [ALTITUDE=200] [AIRE_MINI=0] [OUT=masque.geojson]"
+	@echo "Cibles: doctor | masque [ALTITUDE=200] [INVERSE=0] [AIRE_MINI=0] [OUT=masque.geojson]"
 
 doctor:
 	@for t in gdal_translate gdalinfo gdal_rasterize ogr2ogr gdaltransform python3; do \
@@ -23,4 +24,5 @@ doctor:
 	@echo "OK"
 
 masque:
-	@python3 scripts/masque_altitude.py --altitude $(ALTITUDE) --aire-mini $(AIRE_MINI) --out $(OUT)
+	@if [ "$(INVERSE)" = "1" ]; then INV="--inverse"; else INV=""; fi; \
+	 python3 scripts/masque_altitude.py --altitude $(ALTITUDE) $$INV --aire-mini $(AIRE_MINI) --out $(OUT)

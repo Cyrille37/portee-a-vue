@@ -25,7 +25,8 @@ les masses — collines ou bâtiments — qui dépassent cet horizon.
    d'exploration est l'emprise du VRT (celle définie par le `zone.env`
    du Poc 01).
 2. **Masque binaire** : cellule dans le masque si `MNS > ALTITUDE`
-   (paramètre). Le relief seul (MNH ≈ 0) est capté dès qu'il dépasse
+   (paramètre), ou si `MNS <= ALTITUDE` en mode `--inverse` (voir plus
+   bas). Le relief seul (MNH ≈ 0) est capté dès qu'il dépasse
    le seuil — c'est la différence avec le Poc 02.
 3. **Vectorisation** : `gdal_polygonize` → MultiPolygon avec trous.
 4. **Nettoyage** : optionnel, filtrage des polygones d'aire <
@@ -36,6 +37,25 @@ les masses — collines ou bâtiments — qui dépassent cet horizon.
    ci-dessous, et la `FeatureCollection` embarque les paramètres du
    run (`altitude_m`, `zone_l93`, `aire_mini_m2`, `date_generation`,
    `centre_lat`, `centre_lon` — centre WGS84 de la zone analysée).
+
+## Mode inverse (`--inverse` / `INVERSE=1`)
+
+`make masque ALTITUDE=95 INVERSE=1` dessine l'exact opposé : les
+features représentent **tout ce qui est en dessous de ALTITUDE** —
+typiquement les zones qu'un observateur à cette altitude dominerait
+(zones en contrebas, potentiellement servables), les masses
+au-dessus devenant des trous du polygone dominant.
+
+- **Complémentarité stricte** : le mode direct teste `MNS > ALTITUDE`,
+  le mode inverse `MNS <= ALTITUDE` — une cellule exactement à
+  ALTITUDE (fréquent avec des altitudes entières Int16) est comptée
+  « en dessous ». La réunion des deux masques couvre 100 % de la zone.
+- **Forme de la sortie** : à ALTITUDE proche du niveau moyen du terrain,
+  le masque inverse est un **polygone dominant couvrant presque toute
+  la zone**, parsemé de trous (les masses au-dessus) — le GeoJSON est
+  plus volumineux que le masque direct.
+- Les aires (`aire_m2`) déduisent les trous (anneaux internes).
+- Les métadonnées de run embarquent `inverse: true|false`.
 
 Note : le temps de traitement est proportionnel à la taille de la zone
 ingérée dans le Poc 01 — c'est normal et attendu. La lecture MNS est
@@ -60,16 +80,19 @@ Depuis `backend/poc03` :
 make masque                       # ALTITUDE=200 par défaut
 make masque ALTITUDE=250          # tout ce qui dépasse 250 m NGF
 make masque ALTITUDE=215 OUT=test215.geojson   # fichier de sortie nommé
+make masque ALTITUDE=95 INVERSE=1 # tout ce qui est en dessous de 95 m NGF
 # ou directement :
 python3 scripts/masque_altitude.py --altitude 215 --out masque.geojson
+python3 scripts/masque_altitude.py --altitude 95 --inverse --out dessous.geojson
 ```
 
 Paramètres :
 
 | Paramètre | Défaut | Rôle |
 |---|---|---|
-| `--altitude` | (obligatoire) | altitude absolue NGF (m) au-delà de laquelle une cellule est dans le masque |
-| `--aire-mini` | 0 | aire minimale d'un polygone (m²) — 0 = tout conserver |
+| `--altitude` | (obligatoire) | altitude absolue NGF (m) au-delà de laquelle une cellule est dans le masque (en dessous en mode inverse) |
+| `--inverse` | (off) | masque inverse : cellules avec `MNS <= ALTITUDE` (tout ce qui est en dessous) |
+| `--aire-mini` | 0 | aire minimale d'un polygone (m²), trous déduits — 0 = tout conserver |
 | `--tuile` | 2048 | côté d'une tuile de lecture (cellules) — borne la RAM de lecture |
 | `--out` | masque.geojson | fichier de sortie |
 

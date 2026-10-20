@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""PoC03 - Masque d'altitude absolue : polygones des zones Z_MNS > ALTITUDE.
+"""PoC03 - Masque d'altitude absolue : polygones des zones au-dessus (ou,
+en mode --inverse, au-dessous) de ALTITUDE.
 
 Usage:
-    python3 scripts/masque_altitude.py [--altitude 200] [--out masque.geojson]
+    python3 scripts/masque_altitude.py --altitude 200 [--inverse] [--out masque.geojson]
 
 Pipeline : lit le VRT MNS du PoC01 (son emprise EST la zone d'exploration),
 produit un masque binaire (MNS > altitude, altitude absolue NGF) et
@@ -10,6 +11,11 @@ vectorise via gdal_polygonize. Contrairement au PoC02 (MNH = hors-sol),
 le test est sur l'altitude absolue de la surface : le relief seul est
 capté, ainsi que les batiments et la vegetation qui depassent le seuil.
 Le MNT n'est pas lu (la MNS couvre deja sol + obstacles).
+
+Mode --inverse : le masque devient MNS <= altitude (complementaire
+strict du mode direct — les cellules exactement à ALTITUDE sont
+« en dessous ») : les features representent alors tout ce que l'observateur
+dominerait, un polygone dominant avec les masses au-dessus en trous.
 
 La lecture MNS et les stats zonales sont decoupees en tuiles
 (defaut 2048 x 2048 cellules) pour que la RAM de lecture reste bornee
@@ -104,7 +110,7 @@ def l93_vers_wgs84(x, y):
 
 
 def lire_mns_masque(vrt_mns, x0, y0, x1, y1, w, h, pas_x, pas_y,
-                    altitude, tuile, mns_full, masque):
+                    altitude, inverse, tuile, mns_full, masque):
     """Remplit mns_full/masque tuile par tuile (RAM de lecture bornee).
 
     mns_full est fourni pre-alloue (float32, h x w) car les stats zonales
@@ -123,7 +129,10 @@ def lire_mns_masque(vrt_mns, x0, y0, x1, y1, w, h, pas_x, pas_y,
             x_d = x0 + (rx + tw) * pas_x
             mns_t = gdal_read_array(vrt_mns, x_g, y_bot, x_d, y_haut, tw, th)
             mns_full[ry:ry + th, rx:rx + tw] = mns_t
-            masque[ry:ry + th, rx:rx + tw] = mns_t > altitude
+            if inverse:
+                masque[ry:ry + th, rx:rx + tw] = mns_t <= altitude
+            else:
+                masque[ry:ry + th, rx:rx + tw] = mns_t > altitude
             faite += 1
             print(f"\r  lecture/seuillage: tuile {faite}/{n_tuiles}",
                   end="", flush=True)
@@ -211,28 +220,41 @@ def lire_ids_et_stats(tif_id, mns_full, forme,
     return True, stats
 
 
-def aire_polygone(ring):
-    """Aire d'un anneau en WGS84, convertie en m\u00b2 (échelle locale).
+def aire_anneau(pts, kx, ky):
+    """Aire absolue d'un anneau en WGS84 converti en mètres (échelle locale)."""
+    import numpy as np
+    x, y = pts[:, 0] * kx, pts[:, 1] * ky
+    return 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
+
+def aire_polygone(coordinates):
+    """Aire d'un polygone GeoJSON en WGS84, convertie en m\u00b2 (échelle locale),
+    trous déduits.
 
     Le GeoJSON a été reprojeté en EPSG:4326 : le lacet donne des degrés²,
     qu'on convertit avec le facteur local degrés->mètres autour du centroïde
     (1° lat ≈ 111 320 m ; 1° lon ≈ 111 320·cos(lat)). Précision suffisante
-    pour un filtre d'ordre de grandeur sur ~1 km.
+    pour un filtre d'ordre de grandeur sur ~1 km. Le premier anneau est
+    l'extérieur, les suivants sont des trous (déduits) — indispensable
+    en mode inverse où le polygone dominant est troué.
     """
     import math
     import numpy as np
-    pts = np.asarray(ring)
-    lat0 = float(pts[:, 1].mean())
+    pts0 = np.asarray(coordinates[0])
+    lat0 = float(pts0[:, 1].mean())
     kx = 111320.0 * math.cos(math.radians(lat0))
     ky = 111320.0
-    x, y = pts[:, 0] * kx, pts[:, 1] * ky
-    return 0.5 * abs(float(np.dot(x, np.roll(y, -1)) - np.dot(y, np.roll(x, -1))))
+    aire = aire_anneau(pts0, kx, ky)
+    for ring in coordinates[1:]:
+        aire -= aire_anneau(np.asarray(ring), kx, ky)
+    return max(aire, 0.0)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--altitude", type=float, required=True,
                     help="altitude absolue NGF (m) au-delà de laquelle une cellule est dans le masque")
+    ap.add_argument("--inverse", action="store_true",
+                    help="masque inverse : cellules avec MNS <= altitude (tout ce qui est en dessous)")
     ap.add_argument("--out", default="masque.geojson", help="fichier GeoJSON de sortie")
     ap.add_argument("--aire-mini", type=float, default=0.0,
                     help="aire minimale d'un polygone en m² (défaut: 0 = tout "
@@ -264,11 +286,12 @@ def main():
     mns_full = np.empty((h, w), dtype=np.float32)
     masque = np.empty((h, w), dtype=bool)
     lire_mns_masque(vrt_mns, x0, y0, x1, y1, w, h, pas_x, pas_y,
-                    args.altitude, args.tuile, mns_full, masque)
+                    args.altitude, args.inverse, args.tuile, mns_full, masque)
 
     masque_u8 = masque.view(np.uint8)  # 0/1, compatible PGM/GTiff Byte
     n = int(masque.sum())
-    print(f"  cellules au-dessus de {args.altitude:.1f} m NGF: {n} / {masque.size}"
+    sens = "en dessous de (<=)" if args.inverse else "au-dessus de (>)"
+    print(f"  cellules {sens} {args.altitude:.1f} m NGF: {n} / {masque.size}"
           f" ({100.0 * n / masque.size:.1f} % de la fenêtre)")
 
     with tempfile.TemporaryDirectory() as td:
@@ -322,7 +345,7 @@ def main():
     for f in fc.get("features", []):
         if f["geometry"]["type"] != "Polygon":
             continue
-        aire = aire_polygone(f["geometry"]["coordinates"][0])
+        aire = aire_polygone(f["geometry"]["coordinates"])
         if aire >= args.aire_mini:
             props = {"aire_m2": round(aire, 1)}
             props.update(stats.get(f["properties"].get("DN"), {}))
@@ -334,6 +357,7 @@ def main():
     # parametres du run au niveau de la FeatureCollection
     fc["properties"] = {
         "altitude_m": args.altitude,
+        "inverse": bool(args.inverse),
         "zone_l93": [round(x0, 1), round(y0, 1), round(x1, 1), round(y1, 1)],
         "aire_mini_m2": args.aire_mini,
         "date_generation": datetime.now().isoformat(timespec="seconds"),
