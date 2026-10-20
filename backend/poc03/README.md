@@ -27,7 +27,9 @@ les masses — collines ou bâtiments — qui dépassent cet horizon.
    du Poc 01).
 2. **Masque binaire** : cellule dans le masque si `MNS > ALTITUDE`
    (paramètre), ou si `MNS <= ALTITUDE` en mode `--inverse` (voir plus
-   bas). Le relief seul (MNH ≈ 0) est capté dès qu'il dépasse
+   bas). Les cellules **nodata** (sentinelle du raster, typiquement
+   -9999 : eau, non couvert) sont exclues du masque dans les deux modes.
+   Le relief seul (MNH ≈ 0) est capté dès qu'il dépasse
    le seuil — c'est la différence avec le Poc 02.
 3. **Vectorisation** : `gdal_polygonize` → MultiPolygon avec trous.
 4. **Nettoyage** : optionnel, filtrage des polygones d'aire <
@@ -51,13 +53,15 @@ au-dessus devenant des trous du polygone dominant.
 - **Complémentarité stricte** : le mode direct teste `MNS > ALTITUDE`,
   le mode inverse `MNS <= ALTITUDE` — une cellule exactement à
   ALTITUDE (fréquent avec des altitudes entières Int16) est comptée
-  « en dessous ». La réunion des deux masques couvre 100 % de la zone.
+  « en dessous ». La réunion des deux masques couvre 100 % des
+  **cellules valides** ; le nodata (souvent ~20 % de la zone : eau,
+  hors couverture LiDAR HD) est un troisième état, « inconnu »,
+  présent dans aucune des deux sorties.
 - **Forme de la sortie** : à ALTITUDE proche du niveau moyen du terrain,
   le masque inverse est un **polygone dominant couvrant presque toute
-  la zone**, parsemé de trous (les masses au-dessus). Le GeoJSON est de
-  l'ordre du masque direct — selon la morphologie (en pratique sur la
-  zone de test : 12 126 polygones / 8,4 Mo en inverse contre
-  16 084 / 9,3 Mo en direct).
+  la zone**, parsemé de trous (les masses au-dessus) — les trous nodata
+  en moins, désormais exclus du masque. Le GeoJSON est de
+  l'ordre du masque direct, selon la morphologie.
 - Les aires (`aire_m2`) déduisent les trous (anneaux internes).
 - Les métadonnées de run embarquent `inverse: true|false`.
 
@@ -71,7 +75,7 @@ lu (pas de MNT) : le temps de lecture est moitié moindre que le Poc 02.
 
 | Attribut | Description |
 |---|---|
-| `aire_m2` | Surface du polygone en m² — emprise au sol de la zone dans le masque, **trous déduits** (indépendant du mode direct/inverse). |
+| `aire_m2` | Surface exacte du polygone : nombre de cellules × pas² (4 m²) — indépendant du mode direct/inverse, et non affectée par la simplification géométrique d'export. |
 | `mns_min_m` | Altitude absolue (NGF) minimale des cellules du polygone — en mode direct, altitude à laquelle la masse « commence » au-dessus du seuil ; en mode inverse, point bas de la zone en contrebas. |
 | `mns_moy_m` | Altitude absolue moyenne des cellules — ordre de grandeur de la masse (colline, plateau urbain). |
 | `mns_max_m` | Altitude absolue du point le plus haut — directement le candidat « point haut » pour un répéteur, comparable entre polygones. |
@@ -101,11 +105,10 @@ Paramètres :
 | `--out` | masque.geojson | fichier de sortie |
 
 Note mémoire : la lecture et les stats sont découpées en tuiles, mais
-les grilles MNS/masque restent en RAM (~6 octets/cellule, soit ~2,9 Go
-pour la zone de test 36 x 54 km à 2 m — contre ~4,4 Go au Poc 02 qui
-gardait aussi le MNH). C'est le pipeline minimal pour garder un GeoJSON
-strictement identique (polygonize sur le masque complet, zones jamais
-coupées entre tuiles).
+les grilles MNS/masque/validité restent en RAM (~7 octets/cellule,
+soit ~0,8 Go pour la zone de test 21 x 21 km à 2 m). C'est le pipeline
+minimal pour garder un GeoJSON strictement identique (polygonize sur
+le masque complet, zones jamais coupées entre tuiles).
 
 ## PMTiles ?
 
