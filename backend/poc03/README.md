@@ -4,14 +4,15 @@ Réutilise le socle du [Poc 01](../poc01/README.md) (tuiles 2 m Int16, VRT)
 pour produire un **GeoJSON de polygones avec trous** : l'emprise des
 cellules dont l'**altitude absolue** (Z_MNS, NGF) dépasse le seuil
 paramétré — relief (collines, crêtes), mais aussi bâtiments et forêt qui
-culminent au-dessus du seuil.
+culminent au-dessus du seuil. En mode `--inverse`, ce sont au contraire
+toutes les cellules **en dessous** du seuil (voir « Mode inverse »).
 
 ## Différence avec le Poc 02
 
 | | Poc 02 | Poc 03 |
 |---|---|---|
-| Test | `MNH > seuil` (hauteur **hors-sol** = MNS − MNT) | `MNS > altitude` (altitude **absolue** NGF) |
-| Ce qui sort | uniquement les obstacles hors-sol (bâti, forêt) | le relief **et** les obstacles : tout ce qui dépasse `ALTITUDE` |
+| Test | `MNH > seuil` (hauteur **hors-sol** = MNS − MNT) | `MNS > altitude` (altitude **absolue** NGF), ou `MNS <= altitude` en mode `--inverse` |
+| Ce qui sort | uniquement les obstacles hors-sol (bâti, forêt) | le relief **et** les obstacles : tout ce qui dépasse `ALTITUDE` (ou ce qui est en dessous en mode inverse) |
 | Grilles lues | MNS + MNT | **MNS seule** (le MNT n'est jamais lu) |
 | Sens physique | « où sont les objets hauts » | « tout ce qui est plus haut que l'observateur » — masque d'obstructions pour la portée radio |
 
@@ -35,7 +36,9 @@ les masses — collines ou bâtiments — qui dépassent cet horizon.
 5. **Sortie** : GeoJSON WGS84 (`EPSG:4326`), prêt pour une couche
    `fill` MapLibre ; chaque polygone porte les attributs décrits
    ci-dessous, et la `FeatureCollection` embarque les paramètres du
-   run (`altitude_m`, `zone_l93`, `aire_mini_m2`, `date_generation`,
+   run (`altitude_m`, `inverse`, `zone_l93`, `aire_mini_m2`,
+   `date_generation`, `centre_lat`, `centre_lon` — centre WGS84 de la zone
+   analysée).
    `centre_lat`, `centre_lon` — centre WGS84 de la zone analysée).
 
 ## Mode inverse (`--inverse` / `INVERSE=1`)
@@ -52,8 +55,10 @@ au-dessus devenant des trous du polygone dominant.
   « en dessous ». La réunion des deux masques couvre 100 % de la zone.
 - **Forme de la sortie** : à ALTITUDE proche du niveau moyen du terrain,
   le masque inverse est un **polygone dominant couvrant presque toute
-  la zone**, parsemé de trous (les masses au-dessus) — le GeoJSON est
-  plus volumineux que le masque direct.
+  la zone**, parsemé de trous (les masses au-dessus). Le GeoJSON est de
+  l'ordre du masque direct — selon la morphologie (en pratique sur la
+  zone de test : 12 126 polygones / 8,4 Mo en inverse contre
+  16 084 / 9,3 Mo en direct).
 - Les aires (`aire_m2`) déduisent les trous (anneaux internes).
 - Les métadonnées de run embarquent `inverse: true|false`.
 
@@ -67,8 +72,8 @@ lu (pas de MNT) : le temps de lecture est moitié moindre que le Poc 02.
 
 | Attribut | Description |
 |---|---|
-| `aire_m2` | Surface du polygone en m² — emprise au sol de la zone au-dessus du seuil. |
-| `mns_min_m` | Altitude absolue (NGF) minimale des cellules du polygone — altitude à laquelle la masse « commence » au-dessus du seuil (proche du seuil si le terrain y pénètre doucement). |
+| `aire_m2` | Surface du polygone en m² — emprise au sol de la zone dans le masque, **trous déduits** (indépendant du mode direct/inverse). |
+| `mns_min_m` | Altitude absolue (NGF) minimale des cellules du polygone — en mode direct, altitude à laquelle la masse « commence » au-dessus du seuil ; en mode inverse, point bas de la zone en contrebas. |
 | `mns_moy_m` | Altitude absolue moyenne des cellules — ordre de grandeur de la masse (colline, plateau urbain). |
 | `mns_max_m` | Altitude absolue du point le plus haut — directement le candidat « point haut » pour un répéteur, comparable entre polygones. |
 
