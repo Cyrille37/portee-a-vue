@@ -323,15 +323,21 @@ def main():
                        check=True, capture_output=True)
 
         # champ d'identifiant unique par polygone : le DN polygonise vaut
-        # la valeur du raster (0/1), PAS un id par polygone. Il faut exposer
-        # le rowid comme ATTRIBUT : un simple alias (rowid AS poly_id) fait
-        # de lui le FID de la couche destination (le champ disparait des
-        # attributs — "Failed to find field poly_id" dans gdal_rasterize).
-        # L'expression "rowid + 0" force un vrai champ entier.
+        # la valeur du raster (0/1), PAS un id par polygone. On copie le GPKG
+        # en dialecte SQLITE avec le rowid expose comme attribut. Attention,
+        # deux pieges du SQL OGR par defut (ODR) :
+        # - un alias simple (rowid AS poly_id) fait de lui le FID de la
+        #   couche destination : le champ disparait des attributs ;
+        # - le SELECT implicite de la geometrie ne marche pas en ODR : la
+        #   copie sort SANS geometrie (10138 features "geometry: null"),
+        #   gdal_rasterize et l'export ne voient plus rien.
+        # En dialecte SQLITE, "geom" est la colonne geometrie physique du
+        # GPKG : on la selectionne explicitement, comme poly_id et DN.
         gpkg_id = td / "masque_id.gpkg"
         subprocess.run(
             ["ogr2ogr", str(gpkg_id), str(gpkg),
-             "-sql", "SELECT rowid + 0 AS poly_id, DN FROM masque",
+             "-sql", "SELECT rowid AS poly_id, DN, geom FROM masque",
+             "-dialect", "SQLITE",
              "-nln", "masque"],
             check=True, capture_output=True, text=True)
 
