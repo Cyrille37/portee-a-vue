@@ -85,10 +85,13 @@ Depuis `backend/poc01` :
 
 - `make doctor` — vérifie les prérequis ;
 - `make download` — télécharge les 7 dalles MNS + MNT (~16 Mo chacune)
-  dans `backend/data/downloads/` (flux « une dalle à la fois ») ;
+  dans `backend/data/downloads/` (flux séquentiel, throttling : voir
+  « Limites d'usage des API ») ;
 - `make ingest` — transforme chaque dalle en tuile 2 m Int16
   (`gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE`) avec balises de
-  traçabilité, supprime la source 50 cm ;
+  traçabilité, **supprime la dalle source 50 cm** après transformation
+  (le répertoire `downloads/` est donc vidé au fil de l'ingestion et reste
+  vide en régime normal : les sources 50 cm ne sont jamais conservées) ;
 - `make vrt` — assemble `backend/data/mns.vrt` et `mnt.vrt` ;
 - `make check` — contrôle qualité hors-ligne des 14 tuiles : 500×500 px,
   pas 2 m, Int16, origine alignée sur la dalle 1 km², balises
@@ -121,9 +124,19 @@ Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6706_MNS_O_0M50_LAMB93_IGN69.
 
 - volumétrie constatée : dalle 50 cm ≈ 16 Mo ; tuile 2 m Int16 ≈ 491 Ko ;
   14 dalles (7 MNS + 7 MNT) ingérées sans erreur ;
-- le WMS-R peut renvoyer une `400` transitoire (limite de débit) : le
-  `curl --retry-all-errors --retry 3` la rejoue ; si une dalle manque,
-  relancer `make download` (idempotent) ;
+- Cycle de vie des fichiers téléchargés : `ingest.sh` fait `rm -f` de la
+  dalle 50 cm **après** une ingestion réussie (le `trap 'rm -f' ERR` ne
+  supprime que la tuile dérivée en cas d'échec, jamais la source) ; si
+  `make ingest` est interrompu, les dalles non traitées restent dans
+  `downloads/` et seront reprises au relancement (idempotence).
+- Limites d'usage des API Géoplateforme (par IP) : WMS-R **40 req/s**,
+  API altimétrie **50 req/s**, blocage HTTP 429 de 5 s au-delà. Le PoC
+  reste très en dessous : téléchargements strictement séquentiels (un
+  seul `curl` à la fois, ~16 Mo/dalle), pause de 1 s entre dalles
+  (`DOWNLOAD_PAUSE_S`, 0 pour désactiver), `curl --retry 5 --retry-delay
+  2` qui absorbe les 429/400 transitoires, et `check-remote` limité à
+  10 requêtes. Si une dalle manque malgré tout, relancer `make download`
+  (idempotent) ;
 - attention : `gdalwarp` ne connaît pas `-mo` (erreur `ERROR 6: Unknown
   option name '-mo'`) — d'où le `gdal_edit` séparé ;
 - les boucles `download`/`ingest` du Makefile sont *fail-fast* : une dalle
