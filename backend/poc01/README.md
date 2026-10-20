@@ -130,9 +130,17 @@ Vérification : `gdalinfo ../data/mns/LHD_FXX_0525_6706_MNS_O_0M50_LAMB93_IGN69.
 
 - volumétrie constatée : dalle 50 cm ≈ 16 Mo ; tuile 2 m Int16 ≈ 491 Ko ;
   14 dalles (7 MNS + 7 MNT) ingérées sans erreur ;
-- le WMS-R peut renvoyer une `400` transitoire (limite de débit) : le
-  `curl --retry-all-errors --retry 3` la rejoue ; si une dalle manque,
+- Limites d'usage des API Géoplateforme (par IP) : WMS-R **40 req/s**,
+  API altimétrie **50 req/s**, blocage HTTP 429 de 5 s au-delà. Le PoC
+  reste très en dessous : téléchargements strictement séquentiels (un
+  seul `curl` à la fois, ~16 Mo/dalle), pause de 1 s entre dalles
+  (`DOWNLOAD_PAUSE_S`, 0 pour désactiver), `curl --retry 5 --retry-delay
+  2 --retry-all-errors` qui absorbe les 429/400 transitoires, et
+  `check-remote` limité à 10 requêtes. Si une dalle manque malgré tout,
   relancer `make download` (idempotent) ;
+- conservation des sources 50 cm : `ingest.sh` ne supprime plus la dalle
+  téléchargée (stockage NAS) ; seuls `make clean` et la purge des dalles
+  suspectes (< 10 Mo) de `download.sh` suppriment des fichiers ;
 - attention : `gdalwarp` ne connaît pas `-mo` (erreur `ERROR 6: Unknown
   option name '-mo'`) — d'où le `gdal_edit` séparé ;
 - les boucles `download`/`ingest` du Makefile sont *fail-fast* : une dalle

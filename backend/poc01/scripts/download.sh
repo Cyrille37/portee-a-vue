@@ -33,14 +33,20 @@ if [ -f "${tuile}" ]; then
   exit 0
 fi
 
+# Limites d'usage de la Géoplateforme : le WMS-R est limite a 40 req/s par IP,
+# reponse HTTP 429 (blocage 5 s) au-dela. Throttling : requetes sequentielles
+# + pause inter-dalles + retry curl avec backoff sur les erreurs transitoires.
+PAUSE_S="${DOWNLOAD_PAUSE_S:-1}"
+
 if [ -f "${dst}" ]; then
   echo "Déjà téléchargée, saut: ${dst}"
   exit 0
 fi
 
 echo "Téléchargement ${produit} ${dalle} -> ${dst}"
-curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors \
   --output "${dst}" "${URL}"
+sleep "${PAUSE_S}"
 
 # integrite minimale: une dalle valide fait ~15-25 Mo ; un corps d'erreur
 # WMS-R n'en fait que quelques Ko et ne doit jamais etre accepte
