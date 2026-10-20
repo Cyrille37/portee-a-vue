@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # PoC01 - Ingestion d'une dalle 50 cm en tuile 2 m Int16 (max-pooling)
+# La dalle source 50 cm est CONSERVEE dans data/downloads/ (stockage NAS) ;
+# seul make clean supprime les fichiers telecharges.
 # Usage: scripts/ingest.sh <produit: MNS|MNT> <dalle: 0525_6705>
 set -euo pipefail
 
@@ -37,6 +39,4 @@ command -v gdal_edit >/dev/null || GDAL_EDIT="gdal_edit.py"
   -mo "INGEST_DATE=$(date +%F)" \
   -mo "INGEST_OUTIL=gdalwarp $(gdalinfo --version | grep -o '[0-9.]*') / r=max, tr=2m, Int16" \
   "${dst}"
-
-rm -f "${src}"
 ls -lh "${dst}"

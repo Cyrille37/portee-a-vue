@@ -62,7 +62,7 @@ Les tuiles 2 m sont des **produits dérivés** ; les MNS/MNT 50 cm sont leurs **
 
 1. téléchargement d'une dalle IGN (GeoTIFF 1 km², ~16 Mo, 2 000×2 000 px, float32) ;
 2. transformation `gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE` → tuile dérivée 500×500 px, ~491 Ko, même emprise ;
-3. suppression de la source 50 cm ;
+3. **conservation** de la source 50 cm dans `data/downloads/` (stockage NAS) ;
 4. la tuile garde le nom et l'emprise de la dalle IGN — le carroyage national devient l'index.
 
 MNS et MNT sont ingérés de la même façon dans des sous-répertoires (`mns/`, `mnt/`) sur le même carroyage ; le MNH n'est jamais stocké : il se calcule à la demande par différence (MNS − MNT).
@@ -96,7 +96,8 @@ Depuis `backend/poc01` :
   dans `backend/data/downloads/` (flux « une dalle à la fois ») ;
 - `make ingest` — transforme chaque dalle en tuile 2 m Int16
   (`gdalwarp -r max -tr 2 2 -ot Int16 -ovr NONE`) avec balises de
-  traçabilité, supprime la source 50 cm ;
+  traçabilité ; **la dalle source 50 cm est conservée** dans
+  `data/downloads/` (montage NAS) — seul `make clean` la supprime ;
 - `make vrt` — assemble `backend/data/mns.vrt` et `mnt.vrt` ;
 - `make check` — contrôle qualité hors-ligne des 14 tuiles : 500×500 px,
   pas 2 m, Int16, origine alignée sur la dalle 1 km², balises
