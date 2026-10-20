@@ -30,7 +30,7 @@ Visible si (z_cellule + cible − z_observateur) / d ≥ tan_max_courant
 | `--rayon` | 10000 | rayon du disque d'analyse (m) — jusqu'à 40 km pour la LoRa |
 | `--angle` | 0.1 | angle de numérisation Δθ entre deux rayons (degrés) — voir « Choix de l'angle » |
 | `--cible` | 0.0 | hauteur ajoutée à chaque cellule observée (m) — ex. 1.5 pour un pair LoRa posé au sol |
-| `--k` | 1.0 | coefficient de réfraction effectif appliqué à la courbure : `R_eff = k·R_T` (k = 1.0 → aucune correction ; 7/6 ≈ 1.1667 en standard radio) |
+| `--k` | 1.1667 (7/6) | coefficient de réfraction effectif appliqué à la courbure : `R_eff = k·R_T` (7/6 ≈ 1.1667 = standard radio, équivalent `-cc 0.85714` de `gdal_viewshed` ; k = 1.0 → aucune correction) |
 | `--pas-loin` | 10.0 | pas d'échantillonnage au bord du disque (m) — le pas croît linéairement de la résolution de la grille près du centre à `--pas-loin` à `--rayon` |
 | `--aire-mini` | 0.0 | aire minimale d'un polygone visible en m², trous déduits — 0 = tout conserver |
 | `--out` | viewshed.geojson | fichier GeoJSON de sortie |
