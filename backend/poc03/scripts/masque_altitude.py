@@ -374,8 +374,14 @@ def main():
     fc = json.loads(gj)
     total = len(fc.get("features", []))
     n_multi = 0
+    n_nulles = 0
     gardes = []
     for f in fc.get("features", []):
+        # la simplification Douglas-Peucker (SIMPLIFIE_M) peut effondrer un
+        # petit polygone : OGR exporte alors geometry: null
+        if f.get("geometry") is None:
+            n_nulles += 1
+            continue
         if f["geometry"]["type"] != "Polygon":
             n_multi += 1
             continue
@@ -393,6 +399,9 @@ def main():
             props.pop("poly_id", None)
             f["properties"] = props
             gardes.append(f)
+    if n_nulles:
+        print(f"  avertissement: {n_nulles} geometrie(s) nulle(s) apres simplification "
+              f"({SIMPLIFIE_M:g} m) ignoree(s) — reduire SIMPLIFIE_M pour les conserver")
     if n_multi:
         print(f"  avertissement: {n_multi} feature(s) MultiPolygon ignoree(s) "
               f"(attendu: aucune en pratique)")
